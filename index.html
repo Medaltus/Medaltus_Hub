@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medaltus Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:#001F60; --slate:#6B7BA2; --green:#24E9A3; --sand:#F4DFD0; --silver:#CCD3D5;
+  --white:#ffffff; --bg:#F5F6F9; --bg2:#ECEEF4;
+  --border:rgba(0,31,96,0.10); --border2:rgba(0,31,96,0.06);
+  --text:#001F60; --muted:#6B7BA2; --success:#17A87A; --warn:#C87D2F; --danger:#B84040;
+  --font:'DM Sans',system-ui,sans-serif; --mono:'DM Mono','Fira Mono',monospace;
+  --radius:10px; --radius-sm:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;line-height:1.55;overflow:hidden;}
+
+/* ── Shell ── */
+.shell{display:flex;flex-direction:column;height:100vh;}
+
+/* ── Hub header ── */
+.hub-header{background:var(--navy);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.07);}
+.hub-logo{display:flex;align-items:center;gap:10px;}
+.hub-logo-mark{width:26px;height:26px;background:var(--green);border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.hub-logo-mark svg{width:14px;height:14px;fill:none;stroke:var(--navy);stroke-width:2.2;}
+.hub-wordmark{font-size:15px;font-weight:600;color:#fff;letter-spacing:-.2px;}
+.hub-wordmark span{color:var(--green);}
+.hub-sub{font-size:9.5px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.09em;margin-top:1px;}
+.hub-header-right{display:flex;align-items:center;gap:10px;}
+.hub-user{font-size:11px;color:rgba(255,255,255,0.38);}
+.hub-user strong{color:rgba(255,255,255,0.65);}
+.internal-pill{background:rgba(36,233,163,0.15);border:1px solid rgba(36,233,163,0.22);border-radius:20px;padding:3px 10px;font-size:10px;font-weight:600;color:var(--green);letter-spacing:.05em;text-transform:uppercase;}
+
+/* ── Option switcher (demo) ── */
+.option-switcher{background:rgba(0,0,0,0.25);border-bottom:1px solid rgba(255,255,255,0.06);padding:6px 24px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.option-switcher-label{font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;}
+.opt-btn{padding:4px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);background:none;color:rgba(255,255,255,0.45);font-family:var(--font);font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.opt-btn:hover:not(.active){background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.7);}
+.opt-btn.active{background:var(--green);color:var(--navy);border-color:var(--green);font-weight:600;}
+.opt-switcher-note{font-size:10px;color:rgba(255,255,255,0.22);margin-left:8px;font-style:italic;}
+
+/* ── Option views ── */
+.option-view{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.option-view.active{display:flex;}
+
+/* ════════════════════════════════════
+   OPTION A — Sidebar + content area
+════════════════════════════════════ */
+.opt-a-body{display:flex;flex:1;overflow:hidden;}
+
+/* Brand sidebar */
+.brand-sidebar{width:232px;min-width:232px;background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.bs-search{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.bs-search input{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font);font-size:12px;color:var(--text);background:var(--bg);outline:none;}
+.bs-search input:focus{border-color:var(--slate);}
+.bs-search input::placeholder{color:var(--muted);}
+.bs-list{flex:1;overflow-y:auto;}
+.bs-list::-webkit-scrollbar{width:3px;}
+.bs-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.bs-section{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:10px 14px 3px;background:var(--bg2);}
+.brand-item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 12px;border:none;background:none;font-family:var(--font);font-size:12.5px;color:var(--text);cursor:pointer;text-align:left;transition:all .12s;border-left:3px solid transparent;}
+.brand-item:hover{background:var(--bg);}
+.brand-item.active{background:rgba(0,31,96,0.05);border-left-color:var(--navy);font-weight:500;}
+.brand-dot{width:7px;height:7px;border-radius:50%;background:var(--silver);flex-shrink:0;}
+.brand-dot.live{background:var(--success);}
+.brand-dot.building{background:var(--warn);}
+.bi-info{flex:1;min-width:0;}
+.bi-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;}
+.bi-sub{font-size:10px;color:var(--muted);margin-top:1px;}
+.bi-tag{font-size:9px;font-weight:600;padding:2px 7px;border-radius:10px;background:rgba(0,31,96,0.06);color:var(--slate);white-space:nowrap;flex-shrink:0;}
+
+/* Content area — shared between cards + iframe views */
+.brand-content{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+
+/* Content topbar */
+.content-bar{background:var(--white);border-bottom:1px solid var(--border);padding:0 20px;height:46px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.content-breadcrumb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.content-breadcrumb strong{color:var(--navy);}
+.content-bar-right{display:flex;align-items:center;gap:8px;}
+
+/* View toggle inside content bar */
+.view-toggle{display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+.vt-btn{padding:5px 13px;border:none;background:none;font-family:var(--font);font-size:11.5px;color:var(--muted);cursor:pointer;transition:all .13s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.vt-btn svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.8;}
+.vt-btn:hover{color:var(--navy);}
+.vt-btn.active{background:var(--navy);color:var(--white);}
+.vt-sep{width:1px;background:var(--border);}
+
+.cbar-btn{padding:5px 13px;border-radius:var(--radius-sm);font-size:11.5px;font-family:var(--font);cursor:pointer;transition:all .13s;white-space:nowrap;}
+.cbar-btn-outline{border:1px solid var(--border);background:none;color:var(--muted);}
+.cbar-btn-outline:hover{border-color:var(--navy);color:var(--navy);}
+.cbar-btn-primary{border:none;background:var(--navy);color:#fff;font-weight:500;}
+.cbar-btn-primary:hover{background:#0a2a78;}
+
+/* Cards view */
+.cards-view{flex:1;overflow-y:auto;padding:20px;}
+.cards-view::-webkit-scrollbar{width:4px;}
+.cards-view::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* iframe view */
+.iframe-view{flex:1;overflow:hidden;display:none;}
+.iframe-view iframe{width:100%;height:100%;border:none;}
+.iframe-placeholder{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);text-align:center;padding:40px;}
+.iph-icon{font-size:32px;opacity:.3;}
+.iph-title{font-size:15px;font-weight:500;color:var(--navy);}
+.iph-sub{font-size:12px;line-height:1.7;max-width:400px;color:var(--muted);}
+.iph-code{font-size:11px;font-family:var(--mono);background:var(--bg2);padding:3px 10px;border-radius:4px;color:var(--slate);}
+.iph-btn{margin-top:6px;padding:8px 20px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;}
+
+/* ════════════════════════════════════
+   OPTION B — Top brand tabs + content
+════════════════════════════════════ */
+.opt-b-body{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+.brand-tab-nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 20px;display:flex;overflow-x:auto;flex-shrink:0;}
+.brand-tab-nav::-webkit-scrollbar{height:3px;}
+.brand-tab-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.brand-tab{padding:0 14px;height:46px;display:flex;align-items:center;gap:6px;border:none;background:none;font-family:var(--font);font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .13s;flex-shrink:0;}
+.brand-tab:hover{color:var(--navy);}
+.brand-tab.active{color:var(--navy);border-bottom-color:var(--navy);font-weight:500;}
+.brand-tab-dot{width:6px;height:6px;border-radius:50%;background:var(--silver);flex-shrink:0;}
+.brand-tab-dot.live{background:var(--success);}
+.brand-tab-dot.building{background:var(--warn);}
+.bt-sep{width:1px;height:18px;background:var(--border2);flex-shrink:0;margin:0 3px;align-self:center;}
+
+/* Brand view content (option B) */
+.b-content-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.b-view-bar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:46px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.b-view-title{font-size:14px;font-weight:600;color:var(--navy);letter-spacing:-.2px;}
+.b-view-meta{font-size:11px;color:var(--muted);}
+.b-view-right{display:flex;align-items:center;gap:8px;}
+
+.brand-view{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.brand-view.active{display:flex;}
+
+/* Cards scroll */
+.b-cards-scroll{flex:1;overflow-y:auto;padding:20px 24px;}
+.b-cards-scroll::-webkit-scrollbar{width:4px;}
+.b-cards-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* iframe panel */
+.b-iframe-panel{flex:1;overflow:hidden;display:none;}
+.b-iframe-panel iframe{width:100%;height:100%;border:none;}
+
+/* ════════════════════════════════════
+   SHARED — Summary cards content
+════════════════════════════════════ */
+/* KPI strip */
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px;}
+.ks-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.ks-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px;}
+.ks-val{font-size:22px;font-weight:600;letter-spacing:-.8px;line-height:1;color:var(--navy);}
+.ks-val.sm{font-size:17px;letter-spacing:-.4px;}
+.ks-mom{font-size:11px;margin-top:5px;}
+.ks-mom.up{color:var(--success);}
+.ks-mom.dn{color:var(--danger);}
+.ks-mom.fl{color:var(--muted);}
+
+/* Channel strip */
+.ch-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px;}
+.ch-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.ch-name{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:9px;}
+.ch-val{font-size:17px;font-weight:600;color:var(--navy);letter-spacing:-.4px;}
+.ch-sub{font-size:11px;color:var(--muted);margin-top:3px;}
+.ch-bar{height:3px;background:var(--bg2);border-radius:2px;margin-top:10px;overflow:hidden;}
+.ch-fill{height:100%;border-radius:2px;background:var(--navy);}
+.ch-fill.green{background:var(--green);}
+.ch-fill.slate{background:var(--slate);}
+
+/* Flags */
+.flags-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:18px;}
+.flags-title{font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px;}
+.flag-row{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);}
+.flag-row:last-child{border-bottom:none;}
+.flag-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.flag-dot.w{background:var(--warn);}
+.flag-dot.ok{background:var(--success);}
+.flag-dot.info{background:var(--slate);}
+.flag-text{font-size:12px;color:var(--text);flex:1;line-height:1.5;}
+.flag-tag{font-size:10px;color:var(--muted);background:var(--bg);border:1px solid var(--border2);padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0;}
+
+/* All-brands grid */
+.all-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:13px;}
+.bc{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;cursor:pointer;transition:all .13s;}
+.bc:hover{border-color:var(--slate);box-shadow:0 2px 10px rgba(0,20,60,0.06);}
+.bc-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
+.bc-name{font-size:13.5px;font-weight:600;color:var(--navy);}
+.bc-status{font-size:10px;font-weight:600;display:flex;align-items:center;gap:4px;}
+.st-live{color:var(--success);}
+.st-building{color:var(--warn);}
+.bc-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:11px;}
+.bc-stat-v{font-size:14px;font-weight:600;color:var(--navy);line-height:1;}
+.bc-stat-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+.bc-stat-m{font-size:10px;margin-top:2px;}
+.bc-stat-m.up{color:var(--success);}
+.bc-stat-m.dn{color:var(--danger);}
+.bc-ft{display:flex;align-items:center;justify-content:space-between;padding-top:9px;border-top:1px solid var(--border2);}
+.bc-pills{display:flex;gap:4px;flex-wrap:wrap;}
+.bc-pill{font-size:9px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--bg2);color:var(--slate);text-transform:uppercase;letter-spacing:.04em;}
+.bc-arrow{font-size:12px;color:var(--muted);}
+
+/* Building state */
+.building-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center;gap:10px;}
+.bs-icon{font-size:28px;opacity:.3;}
+.bs-title{font-size:14px;font-weight:500;color:var(--navy);}
+.bs-sub{font-size:12px;color:var(--muted);line-height:1.7;max-width:340px;}
+.bs-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(200,125,47,0.10);border:1px solid rgba(200,125,47,0.20);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:600;color:var(--warn);margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ══ HUB HEADER ══ -->
+<div class="hub-header">
+  <div class="hub-logo">
+    <div class="hub-logo-mark">
+      <svg viewBox="0 0 16 16"><path d="M8 1L1 5v6l7 4 7-4V5L8 1z"/><path d="M8 1v14M1 5l7 4 7-4"/></svg>
+    </div>
+    <div>
+      <div class="hub-wordmark">Medal<span>tus</span> Hub</div>
+      <div class="hub-sub">Brand Dashboard Hub</div>
+    </div>
+  </div>
+  <div class="hub-header-right">
+    <span class="hub-user">Signed in as <strong>jrisser@medaltus.com</strong></span>
+    <span class="internal-pill">Internal Only</span>
+  </div>
+</div>
+
+<!-- ══ OPTION SWITCHER (demo only) ══ -->
+<div class="option-switcher" style="background:var(--navy);">
+  <span class="option-switcher-label">Layout:</span>
+  <button class="opt-btn active" onclick="switchOption('a',this)">Option A — Sidebar</button>
+  <button class="opt-btn" onclick="switchOption('b',this)">Option B — Top Tabs</button>
+  <span class="opt-switcher-note">Demo switcher — not shown in production</span>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     OPTION A — Sidebar + Content Area
+══════════════════════════════════════ -->
+<div class="option-view active" id="opt-a">
+  <div class="opt-a-body">
+
+    <!-- Brand Sidebar -->
+    <div class="brand-sidebar">
+      <div class="bs-search"><input type="text" placeholder="Search brands…" oninput="filterBrands(this.value)"></div>
+      <div class="bs-list" id="a-brand-list">
+        <div class="bs-section">Live — Newderm Seller</div>
+        <button class="brand-item active" onclick="selectBrandA(this,'Évolis Professional','evolis','evolis-xi.vercel.app/internal')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Évolis</div><div class="bi-sub">Hair care</div></div><span class="bi-tag">3ch</span>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Skinuva','skinuva','skinuva.vercel.app/internal')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Skinuva</div><div class="bi-sub">Skincare</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'dearcloud','dearcloud','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">dearcloud</div><div class="bi-sub">Skincare</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'The Crème Shop','cremeshop','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">The Crème Shop</div><div class="bi-sub">Beauty</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Cloud Cafe','cloudcafe','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Cloud Cafe</div><div class="bi-sub">Wellness</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'MiGuard','miguard','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">MiGuard</div><div class="bi-sub">Supplements</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Hillside','hillside','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Hillside</div><div class="bi-sub">Wellness</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Just Bjorn','justbjorn','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Just Bjorn</div><div class="bi-sub">Personal care</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Prohibition','prohibition','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Prohibition</div><div class="bi-sub">Lifestyle</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Eraclea','eraclea','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Eraclea</div><div class="bi-sub">Skincare</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'skinside SEOUL','skinseoul','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">skinside SEOUL</div><div class="bi-sub">K-beauty</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'PB & Jay','pbjay','#')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">PB & Jay</div><div class="bi-sub">Snacks</div></div>
+        </button>
+        <div class="bs-section">Live — VB Cosmetics Seller</div>
+        <button class="brand-item" onclick="selectBrandA(this,'VB Cosmetics','vbc','medaltus-dashboard.vercel.app')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">VB Cosmetics</div><div class="bi-sub">Beauty</div></div>
+        </button>
+        <div class="bs-section">Building Soon</div>
+        <button class="brand-item" onclick="selectBrandA(this,'Amala','amala','#')">
+          <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Amala</div><div class="bi-sub">Skincare — launching</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Collagelee','collagelee','#')">
+          <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Collagelee</div><div class="bi-sub">Supplements — launching</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Cimeosil','cimeosil','#')">
+          <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Cimeosil</div><div class="bi-sub">Medical — separate account</div></div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Content area -->
+    <div class="brand-content">
+      <!-- Content bar with view toggle -->
+      <div class="content-bar">
+        <div class="content-breadcrumb">Hub &rsaquo; <strong id="a-brand-name">Évolis Professional</strong></div>
+        <div class="content-bar-right">
+          <div class="view-toggle">
+            <button class="vt-btn active" id="a-cards-btn" onclick="setViewA('cards')">
+              <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+              Summary
+            </button>
+            <div class="vt-sep"></div>
+            <button class="vt-btn" id="a-dash-btn" onclick="setViewA('dash')">
+              <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>
+              Full Dashboard
+            </button>
+          </div>
+          <button class="cbar-btn cbar-btn-outline" id="a-ext-btn" onclick="alert('Opens partner-facing external dashboard')">Partner View</button>
+          <button class="cbar-btn cbar-btn-primary" id="a-open-btn" onclick="alert('Opens full internal dashboard in new tab')">↗ New Tab</button>
+        </div>
+      </div>
+
+      <!-- Cards view -->
+      <div class="cards-view" id="a-cards-view">
+        <div id="a-cards-content"><!-- populated by JS --></div>
+      </div>
+
+      <!-- iframe view -->
+      <div class="iframe-view" id="a-iframe-view">
+        <div class="iframe-placeholder" id="a-iframe-placeholder">
+          <div class="iph-icon">🏢</div>
+          <div class="iph-title" id="a-iframe-title">Évolis Professional — Internal Dashboard</div>
+          <div class="iph-sub">In production the full internal dashboard loads here as an embedded iframe. Each brand is hosted at its own Vercel URL.</div>
+          <div class="iph-code" id="a-iframe-url">evolis-xi.vercel.app/internal</div>
+          <button class="iph-btn" onclick="alert('Opens dashboard in new tab')">↗ Open in New Tab</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /opt-a -->
+
+
+<!-- ══════════════════════════════════════
+     OPTION B — Top Brand Tabs + Content
+══════════════════════════════════════ -->
+<div class="option-view" id="opt-b">
+  <div class="opt-b-body">
+
+    <!-- Brand tab nav -->
+    <div class="brand-tab-nav">
+      <button class="brand-tab active" onclick="selectBrandB('all',this)">All Brands</button>
+      <div class="bt-sep"></div>
+      <button class="brand-tab" onclick="selectBrandB('evolis',this)"><div class="brand-tab-dot live"></div>Évolis</button>
+      <button class="brand-tab" onclick="selectBrandB('skinuva',this)"><div class="brand-tab-dot live"></div>Skinuva</button>
+      <button class="brand-tab" onclick="selectBrandB('dearcloud',this)"><div class="brand-tab-dot live"></div>dearcloud</button>
+      <button class="brand-tab" onclick="selectBrandB('cremeshop',this)"><div class="brand-tab-dot live"></div>The Crème Shop</button>
+      <button class="brand-tab" onclick="selectBrandB('cloudcafe',this)"><div class="brand-tab-dot live"></div>Cloud Cafe</button>
+      <button class="brand-tab" onclick="selectBrandB('miguard',this)"><div class="brand-tab-dot live"></div>MiGuard</button>
+      <button class="brand-tab" onclick="selectBrandB('hillside',this)"><div class="brand-tab-dot live"></div>Hillside</button>
+      <button class="brand-tab" onclick="selectBrandB('vbc',this)"><div class="brand-tab-dot live"></div>VB Cosmetics</button>
+      <button class="brand-tab" onclick="selectBrandB('amala',this)"><div class="brand-tab-dot building"></div>Amala</button>
+      <button class="brand-tab" onclick="selectBrandB('collagelee',this)"><div class="brand-tab-dot building"></div>Collagelee</button>
+    </div>
+
+    <!-- Content area -->
+    <div class="b-content-area">
+
+      <!-- All brands view -->
+      <div class="brand-view active" id="bv-all">
+        <div class="b-view-bar">
+          <div><div class="b-view-title">All Brands</div><div class="b-view-meta">17 brands · 14 live · 3 building · May 2026</div></div>
+        </div>
+        <div class="b-cards-scroll">
+          <div class="all-grid">
+            <div class="bc" onclick="selectBrandB('evolis',document.querySelector('.brand-tab:nth-child(3)'))">
+              <div class="bc-hd"><div class="bc-name">Évolis Professional</div><div class="bc-status st-live">● Live</div></div>
+              <div class="bc-stats">
+                <div><div class="bc-stat-v">387</div><div class="bc-stat-l">Units</div><div class="bc-stat-m dn">▼ 6%</div></div>
+                <div><div class="bc-stat-v" style="font-size:12px">$17.5K</div><div class="bc-stat-l">Revenue</div><div class="bc-stat-m dn">▼ 4%</div></div>
+                <div><div class="bc-stat-v" style="font-size:12px">$45.20</div><div class="bc-stat-l">AOV</div><div class="bc-stat-m up">▲ 2%</div></div>
+              </div>
+              <div class="bc-ft"><div class="bc-pills"><span class="bc-pill">Amazon</span><span class="bc-pill">Web</span><span class="bc-pill">Walmart</span></div><span class="bc-arrow">→</span></div>
+            </div>
+            <div class="bc" onclick="selectBrandB('skinuva',document.querySelector('.brand-tab:nth-child(4)'))">
+              <div class="bc-hd"><div class="bc-name">Skinuva</div><div class="bc-status st-live">● Live</div></div>
+              <div class="bc-stats">
+                <div><div class="bc-stat-v">214</div><div class="bc-stat-l">Units</div><div class="bc-stat-m up">▲ 11%</div></div>
+                <div><div class="bc-stat-v" style="font-size:12px">$8.9K</div><div class="bc-stat-l">Revenue</div><div class="bc-stat-m up">▲ 9%</div></div>
+                <div><div class="bc-stat-v" style="font-size:12px">$41.55</div><div class="bc-stat-l">AOV</div><div class="bc-stat-m" style="color:var(--muted)">—</div></div>
+              </div>
+              <div class="bc-ft"><div class="bc-pills"><span class="bc-pill">Amazon</span><span class="bc-pill">Walmart</span></div><span class="bc-arrow">→</span></div>
+            </div>
+            <div class="bc" onclick="selectBrandB('miguard',document.querySelector('.brand-tab:nth-child(8)'))">
+              <div class="bc-hd"><div class="bc-name">MiGuard</div><div class="bc-status st-live">● Live</div></div>
+              <div class="bc-stats">
+                <div><div class="bc-stat-v">89</div><div class="bc-stat-l">Units</div><div class="bc-stat-m up">▲ 22%</div></div>
+                <div><div class="bc-stat-v" style="font-size:12px">$3.5K</div><div class="bc-stat-l">Revenue</div><div class="bc-stat-m up">▲ 20%</div></div>
+                <div><div class="bc-stat-v" style="font-size:12px">$39.95</div><div class="bc-stat-l">AOV</div><div class="bc-stat-m" style="color:var(--muted)">—</div></div>
+              </div>
+              <div class="bc-ft"><div class="bc-pills"><span class="bc-pill">Amazon</span></div><span class="bc-arrow">→</span></div>
+            </div>
+            <div class="bc" onclick="selectBrandB('vbc',document.querySelector('.brand-tab:nth-child(10)'))">
+              <div class="bc-hd"><div class="bc-name">VB Cosmetics</div><div class="bc-status st-live">● Live</div></div>
+              <div class="bc-stats">
+                <div><div class="bc-stat-v">—</div><div class="bc-stat-l">Units</div></div>
+                <div><div class="bc-stat-v" style="font-size:12px">—</div><div class="bc-stat-l">Revenue</div></div>
+                <div><div class="bc-stat-v" style="font-size:12px">—</div><div class="bc-stat-l">AOV</div></div>
+              </div>
+              <div class="bc-ft"><div class="bc-pills"><span class="bc-pill">Amazon</span></div><span class="bc-arrow">→</span></div>
+            </div>
+            <div class="bc" onclick="selectBrandB('amala',document.querySelector('.brand-tab:nth-child(11)'))">
+              <div class="bc-hd"><div class="bc-name">Amala</div><div class="bc-status st-building">◌ Building</div></div>
+              <div style="padding:12px 0;"><div class="bs-badge" style="font-size:10px;padding:3px 10px;">⚙ Dashboard in progress</div></div>
+              <div class="bc-ft"><div class="bc-pills"></div><span class="bc-arrow">→</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Évolis brand view -->
+      <div class="brand-view" id="bv-evolis">
+        <div class="b-view-bar">
+          <div><div class="b-view-title">Évolis Professional</div><div class="b-view-meta">Hair care · Amazon · Website · Walmart · May 2026</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-evolis-cards-btn" onclick="setBViewMode('evolis','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-evolis-dash-btn" onclick="setBViewMode('evolis','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-outline" onclick="alert('Opens partner dashboard')">Partner View</button>
+            <button class="cbar-btn cbar-btn-primary" onclick="alert('Opens evolis-xi.vercel.app/internal in new tab')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-evolis-cards">
+          <div class="kpi-strip">
+            <div class="ks-card"><div class="ks-lbl">Total Units</div><div class="ks-val">387</div><div class="ks-mom dn">▼ 6% MOM</div></div>
+            <div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$17.5K</div><div class="ks-mom dn">▼ 4% MOM</div></div>
+            <div class="ks-card"><div class="ks-lbl">Blended AOV</div><div class="ks-val sm">$45.20</div><div class="ks-mom up">▲ 2% MOM</div></div>
+            <div class="ks-card"><div class="ks-lbl">Ad Spend</div><div class="ks-val sm">$1,240</div><div class="ks-mom fl">0% MOM</div></div>
+            <div class="ks-card"><div class="ks-lbl">Blended ACOS</div><div class="ks-val sm">8.4%</div><div class="ks-mom dn">▲ 1.2pp</div></div>
+          </div>
+          <div class="ch-strip">
+            <div class="ch-card"><div class="ch-name">Amazon</div><div class="ch-val">263 units</div><div class="ch-sub">$9.6K · 68% share</div><div class="ch-bar"><div class="ch-fill" style="width:68%"></div></div></div>
+            <div class="ch-card"><div class="ch-name">Website</div><div class="ch-val">86 units</div><div class="ch-sub">$3.8K · 22% share</div><div class="ch-bar"><div class="ch-fill green" style="width:22%"></div></div></div>
+            <div class="ch-card"><div class="ch-name">Walmart</div><div class="ch-val">38 units</div><div class="ch-sub">$1.8K · 10% share</div><div class="ch-bar"><div class="ch-fill slate" style="width:10%"></div></div></div>
+          </div>
+          <div class="flags-card">
+            <div class="flags-title">Flags & Alerts</div>
+            <div class="flag-row"><div class="flag-dot w"></div><div class="flag-text">Amazon organic units down 6% MOM — monitor for 2nd consecutive month</div><span class="flag-tag">Sales</span></div>
+            <div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Website subscription rate 18% — new high, trend intact</div><span class="flag-tag">Website</span></div>
+            <div class="flag-row"><div class="flag-dot w"></div><div class="flag-text">1 insight pending leadership approval before going live</div><span class="flag-tag">Insights</span></div>
+          </div>
+        </div>
+        <div class="b-iframe-panel" id="b-evolis-dash">
+          <div class="iframe-placeholder">
+            <div class="iph-icon">🏢</div>
+            <div class="iph-title">Évolis — Full Internal Dashboard</div>
+            <div class="iph-sub">The complete internal dashboard loads here as an embedded iframe in production.</div>
+            <div class="iph-code">evolis-xi.vercel.app/internal</div>
+            <button class="iph-btn" onclick="alert('Opens evolis-xi.vercel.app/internal')">↗ Open in New Tab</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Other brand views -->
+      <div class="brand-view" id="bv-skinuva">
+        <div class="b-view-bar"><div><div class="b-view-title">Skinuva</div><div class="b-view-meta">Skincare · Amazon · Walmart · May 2026</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary" onclick="alert('Opens skinuva dashboard')">↗ New Tab</button></div></div>
+        <div class="b-cards-scroll"><div class="kpi-strip"><div class="ks-card"><div class="ks-lbl">Units</div><div class="ks-val">214</div><div class="ks-mom up">▲ 11% MOM</div></div><div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$8.9K</div><div class="ks-mom up">▲ 9% MOM</div></div><div class="ks-card"><div class="ks-lbl">AOV</div><div class="ks-val sm">$41.55</div><div class="ks-mom fl">—</div></div></div></div>
+      </div>
+      <div class="brand-view" id="bv-dearcloud"><div class="b-view-bar"><div><div class="b-view-title">dearcloud</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
+      <div class="brand-view" id="bv-cremeshop"><div class="b-view-bar"><div><div class="b-view-title">The Crème Shop</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
+      <div class="brand-view" id="bv-cloudcafe"><div class="b-view-bar"><div><div class="b-view-title">Cloud Cafe</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
+      <div class="brand-view" id="bv-miguard">
+        <div class="b-view-bar"><div><div class="b-view-title">MiGuard</div><div class="b-view-meta">Supplements · Amazon · May 2026</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div>
+        <div class="b-cards-scroll"><div class="kpi-strip"><div class="ks-card"><div class="ks-lbl">Units</div><div class="ks-val">89</div><div class="ks-mom up">▲ 22% MOM</div></div><div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$3.5K</div><div class="ks-mom up">▲ 20% MOM</div></div></div></div>
+      </div>
+      <div class="brand-view" id="bv-hillside"><div class="b-view-bar"><div><div class="b-view-title">Hillside</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live</div></div></div></div></div>
+      <div class="brand-view" id="bv-vbc">
+        <div class="b-view-bar"><div><div class="b-view-title">VB Cosmetics</div><div class="b-view-meta">Beauty · Amazon · VBC Seller Account</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary" onclick="alert('Opens medaltus-dashboard.vercel.app')">↗ New Tab</button></div></div>
+        <div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Note</div><div class="flag-row"><div class="flag-dot info"></div><div class="flag-text">VB Cosmetics is on a separate seller account and Vercel project. Click New Tab to open.</div></div></div></div>
+      </div>
+      <div class="brand-view" id="bv-amala"><div class="b-view-bar"><div><div class="b-view-title">Amala</div></div></div><div class="b-cards-scroll"><div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">Amala's dashboard is being built. Data sources connecting soon.</div><div class="bs-badge">Launching Soon</div></div></div></div>
+      <div class="brand-view" id="bv-collagelee"><div class="b-view-bar"><div><div class="b-view-title">Collagelee</div></div></div><div class="b-cards-scroll"><div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">Collagelee's dashboard is being built.</div><div class="bs-badge">Launching Soon</div></div></div></div>
+
+    </div><!-- /b-content-area -->
+  </div><!-- /opt-b-body -->
+</div><!-- /opt-b -->
+
+</div><!-- /shell -->
+<script>
+// ── Brand data for Option A cards ──
+const brandData = {
+  evolis: {
+    name:'Évolis Professional', meta:'Hair care · Amazon · Website · Walmart · May 2026', url:'evolis-xi.vercel.app/internal',
+    kpis:[{l:'Total Units',v:'387',m:'▼ 6% MOM',t:'dn'},{l:'Revenue',v:'$17.5K',m:'▼ 4% MOM',t:'dn'},{l:'Blended AOV',v:'$45.20',m:'▲ 2% MOM',t:'up'},{l:'Ad Spend',v:'$1,240',m:'0% MOM',t:'fl'},{l:'ACOS',v:'8.4%',m:'▲ 1.2pp',t:'dn'}],
+    channels:[{n:'Amazon',v:'263 units',s:'$9.6K · 68% share',w:68,c:''},{n:'Website',v:'86 units',s:'$3.8K · 22% share',w:22,c:'green'},{n:'Walmart',v:'38 units',s:'$1.8K · 10% share',w:10,c:'slate'}],
+    flags:[{t:'w',x:'Amazon organic units down 6% MOM — monitor for 2nd consecutive month',tag:'Sales'},{t:'ok',x:'Website subscription rate 18% — new high, trend intact',tag:'Website'},{t:'w',x:'1 insight pending leadership approval before going live',tag:'Insights'}]
+  },
+  skinuva: { name:'Skinuva', meta:'Skincare · Amazon · Walmart · May 2026', url:'skinuva.vercel.app/internal',
+    kpis:[{l:'Units',v:'214',m:'▲ 11% MOM',t:'up'},{l:'Revenue',v:'$8.9K',m:'▲ 9% MOM',t:'up'},{l:'AOV',v:'$41.55',m:'—',t:'fl'}],
+    channels:[],flags:[]
+  },
+  miguard: { name:'MiGuard', meta:'Supplements · Amazon · May 2026', url:'miguard.vercel.app/internal',
+    kpis:[{l:'Units',v:'89',m:'▲ 22% MOM',t:'up'},{l:'Revenue',v:'$3.5K',m:'▲ 20% MOM',t:'up'},{l:'AOV',v:'$39.95',m:'—',t:'fl'}],
+    channels:[],flags:[]
+  },
+  vbc: { name:'VB Cosmetics', meta:'Beauty · Amazon · VBC Seller Account', url:'medaltus-dashboard.vercel.app',
+    kpis:[],channels:[],
+    flags:[{t:'info',x:'VB Cosmetics runs on a separate seller account and Vercel project.',tag:'Note'}]
+  },
+  default: { name:'', meta:'Dashboard live — click ↗ New Tab to open the full dashboard', url:'',
+    kpis:[],channels:[],flags:[{t:'ok',x:'Dashboard is live. Click ↗ New Tab to open.',tag:'Status'}]
+  },
+  building: { name:'', meta:'Dashboard in progress', url:'',
+    kpis:[],channels:[],
+    flags:[{t:'w',x:'This dashboard is currently being built. Check back soon.',tag:'Building'}]
+  }
+};
+const buildingBrands = ['amala','collagelee','cimeosil'];
+
+function getBrandData(id) {
+  if (buildingBrands.includes(id)) return brandData.building;
+  return brandData[id] || brandData.default;
+}
+
+function renderCards(id) {
+  const d = getBrandData(id);
+  let html = '';
+  if (d.kpis.length) {
+    html += '<div class="kpi-strip">' + d.kpis.map(k =>
+      `<div class="ks-card"><div class="ks-lbl">${k.l}</div><div class="ks-val${k.v.length>5?' sm':''}">${k.v}</div><div class="ks-mom ${k.t}">${k.m}</div></div>`
+    ).join('') + '</div>';
+  }
+  if (d.channels.length) {
+    html += '<div class="ch-strip">' + d.channels.map(c =>
+      `<div class="ch-card"><div class="ch-name">${c.n}</div><div class="ch-val">${c.v}</div><div class="ch-sub">${c.s}</div><div class="ch-bar"><div class="ch-fill ${c.c}" style="width:${c.w}%"></div></div></div>`
+    ).join('') + '</div>';
+  }
+  if (d.flags.length) {
+    html += '<div class="flags-card"><div class="flags-title">Flags & Alerts</div>' + d.flags.map(f =>
+      `<div class="flag-row"><div class="flag-dot ${f.t}"></div><div class="flag-text">${f.x}</div><span class="flag-tag">${f.tag}</span></div>`
+    ).join('') + '</div>';
+  }
+  if (buildingBrands.includes(id)) {
+    html = `<div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">This brand's dashboard is being built and connected to data sources.</div><div class="bs-badge">Launching Soon</div></div>`;
+  }
+  return html;
+}
+
+// ── Option A logic ──
+let currentViewA = 'cards';
+
+function selectBrandA(btn, name, id, url) {
+  document.querySelectorAll('#opt-a .brand-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('a-brand-name').textContent = name;
+  document.getElementById('a-iframe-title').textContent = name + ' — Internal Dashboard';
+  document.getElementById('a-iframe-url').textContent = url !== '#' ? url : '(URL not yet configured)';
+  document.getElementById('a-cards-content').innerHTML = renderCards(id);
+  setViewA(currentViewA);
+}
+
+function setViewA(mode) {
+  currentViewA = mode;
+  const cards = document.getElementById('a-cards-view');
+  const iframe = document.getElementById('a-iframe-view');
+  const cBtn = document.getElementById('a-cards-btn');
+  const dBtn = document.getElementById('a-dash-btn');
+  if (mode === 'cards') {
+    cards.style.display = 'block'; iframe.style.display = 'none';
+    cBtn.classList.add('active'); dBtn.classList.remove('active');
+  } else {
+    cards.style.display = 'none'; iframe.style.display = 'flex';
+    cBtn.classList.remove('active'); dBtn.classList.add('active');
+  }
+}
+
+// Initialise A with evolis
+document.getElementById('a-cards-content').innerHTML = renderCards('evolis');
+
+// ── Option B logic ──
+function selectBrandB(id, btn) {
+  document.querySelectorAll('#opt-b .brand-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('#opt-b .brand-tab').forEach(b => b.classList.remove('active'));
+  const view = document.getElementById('bv-' + id);
+  if (view) view.classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+function setBViewMode(brandId, mode) {
+  const cards = document.getElementById('b-' + brandId + '-cards');
+  const dash  = document.getElementById('b-' + brandId + '-dash');
+  const cBtn  = document.getElementById('b-' + brandId + '-cards-btn');
+  const dBtn  = document.getElementById('b-' + brandId + '-dash-btn');
+  if (!cards || !dash) return;
+  if (mode === 'cards') {
+    cards.style.display = 'block'; dash.style.display = 'none';
+    if(cBtn) cBtn.classList.add('active'); if(dBtn) dBtn.classList.remove('active');
+  } else {
+    cards.style.display = 'none'; dash.style.display = 'flex';
+    if(cBtn) cBtn.classList.remove('active'); if(dBtn) dBtn.classList.add('active');
+  }
+}
+
+// ── Option switcher ──
+function switchOption(opt, btn) {
+  document.querySelectorAll('.option-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('opt-' + opt).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Brand search (Option A) ──
+function filterBrands(q) {
+  const s = q.toLowerCase();
+  document.querySelectorAll('#a-brand-list .brand-item').forEach(btn => {
+    const name = btn.querySelector('.bi-name').textContent.toLowerCase();
+    btn.style.display = name.includes(s) ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>
