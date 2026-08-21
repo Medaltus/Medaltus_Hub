@@ -633,6 +633,7 @@ function renderIframeA(url, name) {
   const c = document.getElementById('a-iframe-container');
   if (url && url.startsWith('http')) {
     c.innerHTML = `<iframe src="${url}" title="${name} — Internal Dashboard"></iframe>`;
+    setTimeout(resizeVisibleIframes, 250);
   } else {
     c.innerHTML = `<div class="iframe-placeholder">
       <div class="iph-icon">🏢</div>
@@ -642,6 +643,29 @@ function renderIframeA(url, name) {
     </div>`;
   }
 }
+
+// ── Iframe sizing workaround ──
+// Some embedded dashboards measure their own layout width once on initial mount,
+// before the browser has finished sizing the iframe box (which starts at the
+// default 300x150 until our CSS/flex layout resolves). Forcing explicit pixel
+// dimensions — rather than leaving it at width:100%/height:100% — gives those
+// pages a stable, already-correct box to measure on first paint. Re-run this
+// whenever a panel becomes visible or the window resizes.
+function resizeVisibleIframes() {
+  document.querySelectorAll('.b-iframe-panel, .iframe-view').forEach(panel => {
+    const visible = panel.style.display !== 'none' && panel.offsetParent !== null;
+    if (!visible) return;
+    const iframe = panel.querySelector('iframe');
+    if (!iframe) return;
+    const rect = panel.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      iframe.style.width = Math.round(rect.width) + 'px';
+      iframe.style.height = Math.round(rect.height) + 'px';
+    }
+  });
+}
+window.addEventListener('resize', resizeVisibleIframes);
+window.addEventListener('load', () => setTimeout(resizeVisibleIframes, 250));
 
 function openCurrentDashA() {
   if (currentUrlA && currentUrlA.startsWith('http')) {
@@ -663,6 +687,7 @@ function setViewA(mode) {
   } else {
     cards.style.display = 'none'; iframe.style.display = 'flex';
     cBtn.classList.remove('active'); dBtn.classList.add('active');
+    setTimeout(resizeVisibleIframes, 100);
   }
 }
 
@@ -691,6 +716,7 @@ function setBViewMode(brandId, mode) {
   } else {
     cards.style.display = 'none'; dash.style.display = 'flex';
     if(cBtn) cBtn.classList.remove('active'); if(dBtn) dBtn.classList.add('active');
+    setTimeout(resizeVisibleIframes, 100);
   }
 }
 
