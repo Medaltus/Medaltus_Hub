@@ -249,11 +249,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div class="bs-search"><input type="text" placeholder="Search brands…" oninput="filterBrands(this.value)"></div>
       <div class="bs-list" id="a-brand-list">
         <div class="bs-section">Live — Newderm Seller</div>
-        <button class="brand-item active" onclick="selectBrandA(this,'Évolis Professional','evolis','evolis-xi.vercel.app/internal')">
+        <button class="brand-item active" onclick="selectBrandA(this,'Évolis Professional','evolis','https://evolis.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Évolis</div><div class="bi-sub">Hair care</div></div><span class="bi-tag">3ch</span>
         </button>
-        <button class="brand-item" onclick="selectBrandA(this,'Skinuva','skinuva','skinuva.vercel.app/internal')">
+        <button class="brand-item" onclick="selectBrandA(this,'Skinuva','skinuva','https://skinuva.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Skinuva</div><div class="bi-sub">Skincare</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Cosmette Skincare','cosmette','https://cosmetteskincare.medaltus.com/')">
+          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Cosmette Skincare</div><div class="bi-sub">Skincare</div></div>
         </button>
         <button class="brand-item" onclick="selectBrandA(this,'dearcloud','dearcloud','#')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">dearcloud</div><div class="bi-sub">Skincare</div></div>
@@ -286,7 +289,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">PB & Jay</div><div class="bi-sub">Snacks</div></div>
         </button>
         <div class="bs-section">Live — VB Cosmetics Seller</div>
-        <button class="brand-item" onclick="selectBrandA(this,'VB Cosmetics','vbc','medaltus-dashboard.vercel.app')">
+        <button class="brand-item" onclick="selectBrandA(this,'VB Cosmetics','vbc','https://vbcosmeticsreport.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">VB Cosmetics</div><div class="bi-sub">Beauty</div></div>
         </button>
         <div class="bs-section">Building Soon</div>
@@ -320,7 +323,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
             </button>
           </div>
           <button class="cbar-btn cbar-btn-outline" id="a-ext-btn" onclick="alert('Opens partner-facing external dashboard')">Partner View</button>
-          <button class="cbar-btn cbar-btn-primary" id="a-open-btn" onclick="alert('Opens full internal dashboard in new tab')">↗ New Tab</button>
+          <button class="cbar-btn cbar-btn-primary" id="a-open-btn" onclick="openCurrentDashA()">↗ New Tab</button>
         </div>
       </div>
 
@@ -331,13 +334,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
       <!-- iframe view -->
       <div class="iframe-view" id="a-iframe-view">
-        <div class="iframe-placeholder" id="a-iframe-placeholder">
-          <div class="iph-icon">🏢</div>
-          <div class="iph-title" id="a-iframe-title">Évolis Professional — Internal Dashboard</div>
-          <div class="iph-sub">In production the full internal dashboard loads here as an embedded iframe. Each brand is hosted at its own Vercel URL.</div>
-          <div class="iph-code" id="a-iframe-url">evolis-xi.vercel.app/internal</div>
-          <button class="iph-btn" onclick="alert('Opens dashboard in new tab')">↗ Open in New Tab</button>
-        </div>
+        <div id="a-iframe-container" style="height:100%;"></div>
       </div>
     </div>
 
@@ -365,6 +362,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <button class="brand-tab" onclick="selectBrandB('vbc',this)"><div class="brand-tab-dot live"></div>VB Cosmetics</button>
       <button class="brand-tab" onclick="selectBrandB('amala',this)"><div class="brand-tab-dot building"></div>Amala</button>
       <button class="brand-tab" onclick="selectBrandB('collagelee',this)"><div class="brand-tab-dot building"></div>Collagelee</button>
+      <div class="bt-sep"></div>
+      <button class="brand-tab" onclick="selectBrandB('cosmette',this)"><div class="brand-tab-dot live"></div>Cosmette Skincare</button>
     </div>
 
     <!-- Content area -->
@@ -373,7 +372,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <!-- All brands view -->
       <div class="brand-view active" id="bv-all">
         <div class="b-view-bar">
-          <div><div class="b-view-title">All Brands</div><div class="b-view-meta">17 brands · 14 live · 3 building · May 2026</div></div>
+          <div><div class="b-view-title">All Brands</div><div class="b-view-meta">18 brands · 15 live · 3 building · May 2026</div></div>
         </div>
         <div class="b-cards-scroll">
           <div class="all-grid">
@@ -418,6 +417,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
               <div style="padding:12px 0;"><div class="bs-badge" style="font-size:10px;padding:3px 10px;">⚙ Dashboard in progress</div></div>
               <div class="bc-ft"><div class="bc-pills"></div><span class="bc-arrow">→</span></div>
             </div>
+            <div class="bc" onclick="selectBrandB('cosmette',document.querySelector('.brand-tab:nth-child(14)'))">
+              <div class="bc-hd"><div class="bc-name">Cosmette Skincare</div><div class="bc-status st-live">● Live</div></div>
+              <div style="padding:12px 0 6px;font-size:11px;color:var(--muted);">Full dashboard live — click through for real-time data</div>
+              <div class="bc-ft"><div class="bc-pills"><span class="bc-pill">Amazon</span></div><span class="bc-arrow">→</span></div>
+            </div>
           </div>
         </div>
       </div>
@@ -437,7 +441,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
               </button>
             </div>
             <button class="cbar-btn cbar-btn-outline" onclick="alert('Opens partner dashboard')">Partner View</button>
-            <button class="cbar-btn cbar-btn-primary" onclick="alert('Opens evolis-xi.vercel.app/internal in new tab')">↗ New Tab</button>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://evolis.medaltus.com/','_blank')">↗ New Tab</button>
           </div>
         </div>
         <div class="b-cards-scroll" id="b-evolis-cards">
@@ -461,20 +465,31 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           </div>
         </div>
         <div class="b-iframe-panel" id="b-evolis-dash">
-          <div class="iframe-placeholder">
-            <div class="iph-icon">🏢</div>
-            <div class="iph-title">Évolis — Full Internal Dashboard</div>
-            <div class="iph-sub">The complete internal dashboard loads here as an embedded iframe in production.</div>
-            <div class="iph-code">evolis-xi.vercel.app/internal</div>
-            <button class="iph-btn" onclick="alert('Opens evolis-xi.vercel.app/internal')">↗ Open in New Tab</button>
-          </div>
+          <iframe src="https://evolis.medaltus.com/" title="Évolis — Full Internal Dashboard"></iframe>
         </div>
       </div>
 
       <!-- Other brand views -->
       <div class="brand-view" id="bv-skinuva">
-        <div class="b-view-bar"><div><div class="b-view-title">Skinuva</div><div class="b-view-meta">Skincare · Amazon · Walmart · May 2026</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary" onclick="alert('Opens skinuva dashboard')">↗ New Tab</button></div></div>
-        <div class="b-cards-scroll"><div class="kpi-strip"><div class="ks-card"><div class="ks-lbl">Units</div><div class="ks-val">214</div><div class="ks-mom up">▲ 11% MOM</div></div><div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$8.9K</div><div class="ks-mom up">▲ 9% MOM</div></div><div class="ks-card"><div class="ks-lbl">AOV</div><div class="ks-val sm">$41.55</div><div class="ks-mom fl">—</div></div></div></div>
+        <div class="b-view-bar">
+          <div><div class="b-view-title">Skinuva</div><div class="b-view-meta">Skincare · Amazon · Walmart · May 2026</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-skinuva-cards-btn" onclick="setBViewMode('skinuva','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-skinuva-dash-btn" onclick="setBViewMode('skinuva','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://skinuva.medaltus.com/','_blank')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-skinuva-cards"><div class="kpi-strip"><div class="ks-card"><div class="ks-lbl">Units</div><div class="ks-val">214</div><div class="ks-mom up">▲ 11% MOM</div></div><div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$8.9K</div><div class="ks-mom up">▲ 9% MOM</div></div><div class="ks-card"><div class="ks-lbl">AOV</div><div class="ks-val sm">$41.55</div><div class="ks-mom fl">—</div></div></div></div>
+        <div class="b-iframe-panel" id="b-skinuva-dash">
+          <iframe src="https://skinuva.medaltus.com/" title="Skinuva — Full Internal Dashboard"></iframe>
+        </div>
       </div>
       <div class="brand-view" id="bv-dearcloud"><div class="b-view-bar"><div><div class="b-view-title">dearcloud</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
       <div class="brand-view" id="bv-cremeshop"><div class="b-view-bar"><div><div class="b-view-title">The Crème Shop</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
@@ -485,8 +500,46 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       </div>
       <div class="brand-view" id="bv-hillside"><div class="b-view-bar"><div><div class="b-view-title">Hillside</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live</div></div></div></div></div>
       <div class="brand-view" id="bv-vbc">
-        <div class="b-view-bar"><div><div class="b-view-title">VB Cosmetics</div><div class="b-view-meta">Beauty · Amazon · VBC Seller Account</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary" onclick="alert('Opens medaltus-dashboard.vercel.app')">↗ New Tab</button></div></div>
-        <div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Note</div><div class="flag-row"><div class="flag-dot info"></div><div class="flag-text">VB Cosmetics is on a separate seller account and Vercel project. Click New Tab to open.</div></div></div></div>
+        <div class="b-view-bar">
+          <div><div class="b-view-title">VB Cosmetics</div><div class="b-view-meta">Beauty · Amazon · VBC Seller Account</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-vbc-cards-btn" onclick="setBViewMode('vbc','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-vbc-dash-btn" onclick="setBViewMode('vbc','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://vbcosmeticsreport.medaltus.com/','_blank')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-vbc-cards"><div class="flags-card"><div class="flags-title">Note</div><div class="flag-row"><div class="flag-dot info"></div><div class="flag-text">VB Cosmetics is on a separate seller account and Vercel project.</div></div></div></div>
+        <div class="b-iframe-panel" id="b-vbc-dash">
+          <iframe src="https://vbcosmeticsreport.medaltus.com/" title="VB Cosmetics — Full Report Dashboard"></iframe>
+        </div>
+      </div>
+      <div class="brand-view" id="bv-cosmette">
+        <div class="b-view-bar">
+          <div><div class="b-view-title">Cosmette Skincare</div><div class="b-view-meta">Skincare · Live dashboard</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-cosmette-cards-btn" onclick="setBViewMode('cosmette','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-cosmette-dash-btn" onclick="setBViewMode('cosmette','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://cosmetteskincare.medaltus.com/','_blank')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-cosmette-cards"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard is live. Click Full Dashboard to view real-time data.</div></div></div></div>
+        <div class="b-iframe-panel" id="b-cosmette-dash">
+          <iframe src="https://cosmetteskincare.medaltus.com/" title="Cosmette Skincare — Full Dashboard"></iframe>
+        </div>
       </div>
       <div class="brand-view" id="bv-amala"><div class="b-view-bar"><div><div class="b-view-title">Amala</div></div></div><div class="b-cards-scroll"><div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">Amala's dashboard is being built. Data sources connecting soon.</div><div class="bs-badge">Launching Soon</div></div></div></div>
       <div class="brand-view" id="bv-collagelee"><div class="b-view-bar"><div><div class="b-view-title">Collagelee</div></div></div><div class="b-cards-scroll"><div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">Collagelee's dashboard is being built.</div><div class="bs-badge">Launching Soon</div></div></div></div>
@@ -500,20 +553,24 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // ── Brand data for Option A cards ──
 const brandData = {
   evolis: {
-    name:'Évolis Professional', meta:'Hair care · Amazon · Website · Walmart · May 2026', url:'evolis-xi.vercel.app/internal',
+    name:'Évolis Professional', meta:'Hair care · Amazon · Website · Walmart · May 2026', url:'https://evolis.medaltus.com/',
     kpis:[{l:'Total Units',v:'387',m:'▼ 6% MOM',t:'dn'},{l:'Revenue',v:'$17.5K',m:'▼ 4% MOM',t:'dn'},{l:'Blended AOV',v:'$45.20',m:'▲ 2% MOM',t:'up'},{l:'Ad Spend',v:'$1,240',m:'0% MOM',t:'fl'},{l:'ACOS',v:'8.4%',m:'▲ 1.2pp',t:'dn'}],
     channels:[{n:'Amazon',v:'263 units',s:'$9.6K · 68% share',w:68,c:''},{n:'Website',v:'86 units',s:'$3.8K · 22% share',w:22,c:'green'},{n:'Walmart',v:'38 units',s:'$1.8K · 10% share',w:10,c:'slate'}],
     flags:[{t:'w',x:'Amazon organic units down 6% MOM — monitor for 2nd consecutive month',tag:'Sales'},{t:'ok',x:'Website subscription rate 18% — new high, trend intact',tag:'Website'},{t:'w',x:'1 insight pending leadership approval before going live',tag:'Insights'}]
   },
-  skinuva: { name:'Skinuva', meta:'Skincare · Amazon · Walmart · May 2026', url:'skinuva.vercel.app/internal',
+  skinuva: { name:'Skinuva', meta:'Skincare · Amazon · Walmart · May 2026', url:'https://skinuva.medaltus.com/',
     kpis:[{l:'Units',v:'214',m:'▲ 11% MOM',t:'up'},{l:'Revenue',v:'$8.9K',m:'▲ 9% MOM',t:'up'},{l:'AOV',v:'$41.55',m:'—',t:'fl'}],
     channels:[],flags:[]
+  },
+  cosmette: { name:'Cosmette Skincare', meta:'Skincare · Live dashboard', url:'https://cosmetteskincare.medaltus.com/',
+    kpis:[],channels:[],
+    flags:[{t:'ok',x:'Dashboard is live. Click Full Dashboard to view real-time data.',tag:'Status'}]
   },
   miguard: { name:'MiGuard', meta:'Supplements · Amazon · May 2026', url:'miguard.vercel.app/internal',
     kpis:[{l:'Units',v:'89',m:'▲ 22% MOM',t:'up'},{l:'Revenue',v:'$3.5K',m:'▲ 20% MOM',t:'up'},{l:'AOV',v:'$39.95',m:'—',t:'fl'}],
     channels:[],flags:[]
   },
-  vbc: { name:'VB Cosmetics', meta:'Beauty · Amazon · VBC Seller Account', url:'medaltus-dashboard.vercel.app',
+  vbc: { name:'VB Cosmetics', meta:'Beauty · Amazon · VBC Seller Account', url:'https://vbcosmeticsreport.medaltus.com/',
     kpis:[],channels:[],
     flags:[{t:'info',x:'VB Cosmetics runs on a separate seller account and Vercel project.',tag:'Note'}]
   },
@@ -558,15 +615,40 @@ function renderCards(id) {
 
 // ── Option A logic ──
 let currentViewA = 'cards';
+let currentUrlA = 'https://evolis.medaltus.com/';
+let currentNameA = 'Évolis Professional';
 
 function selectBrandA(btn, name, id, url) {
   document.querySelectorAll('#opt-a .brand-item').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('a-brand-name').textContent = name;
-  document.getElementById('a-iframe-title').textContent = name + ' — Internal Dashboard';
-  document.getElementById('a-iframe-url').textContent = url !== '#' ? url : '(URL not yet configured)';
+  currentUrlA = url;
+  currentNameA = name;
   document.getElementById('a-cards-content').innerHTML = renderCards(id);
+  renderIframeA(url, name);
   setViewA(currentViewA);
+}
+
+function renderIframeA(url, name) {
+  const c = document.getElementById('a-iframe-container');
+  if (url && url.startsWith('http')) {
+    c.innerHTML = `<iframe src="${url}" title="${name} — Internal Dashboard"></iframe>`;
+  } else {
+    c.innerHTML = `<div class="iframe-placeholder">
+      <div class="iph-icon">🏢</div>
+      <div class="iph-title">${name} — Internal Dashboard</div>
+      <div class="iph-sub">This dashboard isn't wired into the hub yet. Once it's live at its own URL, drop the link in and it'll embed right here.</div>
+      <div class="iph-code">${url && url !== '#' ? url : '(URL not yet configured)'}</div>
+    </div>`;
+  }
+}
+
+function openCurrentDashA() {
+  if (currentUrlA && currentUrlA.startsWith('http')) {
+    window.open(currentUrlA, '_blank');
+  } else {
+    alert(currentNameA + ' dashboard URL is not yet configured.');
+  }
 }
 
 function setViewA(mode) {
@@ -586,6 +668,7 @@ function setViewA(mode) {
 
 // Initialise A with evolis
 document.getElementById('a-cards-content').innerHTML = renderCards('evolis');
+renderIframeA(currentUrlA, currentNameA);
 
 // ── Option B logic ──
 function selectBrandB(id, btn) {
