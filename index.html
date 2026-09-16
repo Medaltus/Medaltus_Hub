@@ -517,7 +517,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
             <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://skinuva.medaltus.com/','_blank')">↗ New Tab</button>
           </div>
         </div>
-        <div class="b-cards-scroll" id="b-skinuva-cards"><div class="kpi-strip"><div class="ks-card"><div class="ks-lbl">Units</div><div class="ks-val">214</div><div class="ks-mom up">▲ 11% MOM</div></div><div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$8.9K</div><div class="ks-mom up">▲ 9% MOM</div></div><div class="ks-card"><div class="ks-lbl">AOV</div><div class="ks-val sm">$41.55</div><div class="ks-mom fl">—</div></div></div></div>
+        <div class="b-cards-scroll" id="b-skinuva-cards"></div>
         <div class="b-iframe-panel" id="b-skinuva-dash">
           <iframe src="https://skinuva.medaltus.com/" title="Skinuva — Full Internal Dashboard"></iframe>
         </div>
@@ -2067,6 +2067,1491 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 </script>
 
 <script>
+(function () {
+  'use strict';
+
+  // These constants live at top-level scope in Skinuva's real dashboard
+  // file (outside this IIFE), resolved from window.SHEET_CFG there.
+  // Inlined here as literals since the hub only ports this one
+  // self-contained Overview module, not window.SHEET_CFG itself.
+  const OV_BUSINESS_REPORT_SHEET_ID = '1Jkx7Ztnt59eniYtvTnpXB8D7xMnCyjC8b49xB4J59ww';
+  const OV_BUSINESS_REPORT_GID      = '392764444';
+  const OV_RETURNS_SHEET_ID = '16mnFaFkTfXS4FzZ2mI5aoDKNrw8FWe8R8IUDnv3FHVs';
+  const OV_RETURNS_SKINUVA_GID = '1829077418';
+  const OV_WEB_ORDERS_SHEET_ID = '1mjMQXycVu87z8K7chHiTILQTn_EAd29fEhWXcjOxKzk';
+  const OV_WEB_RETURNS_GID     = '1341096453';
+  const OV_WMT_RETURNS_SHEET_ID = '1XxYmX0NT-4bqKh4N96zNAPIAzctXDQaK6Yzp6hVWjJc';
+  const OV_WMT_RETURNS_GID      = '335941769';
+
+
+  function sheetCsvUrl(id, gid) { return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`; }
+  function isCsv(t) { t = (t || '').trim(); return t.length > 0 && !t.startsWith('<') && !t.startsWith('{'); }
+  function parseCsvLine(line) {
+    const result = []; let cur = '', inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQuote = !inQuote; }
+      else if (c === ',' && !inQuote) { result.push(cur); cur = ''; }
+      else { cur += c; }
+    }
+    result.push(cur);
+    return result;
+  }
+  function parseCsv(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return [];
+    const headers = parseCsvLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
+    return lines.slice(1).map(line => {
+      const vals = parseCsvLine(line);
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/^"|"$/g, '').trim(); });
+      return obj;
+    });
+  }
+  function normalizeDate(val) {
+    if (!val) return '';
+    if (/^\d{4}-\d{2}/.test(val)) return val.substring(0, 10);
+    const parts = val.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0'), d = parts[1].padStart(2, '0');
+      const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    return val;
+  }
+  function parseAmt(v) { if (!v) return 0; return parseFloat(String(v).replace(/[$,]/g, '')) || 0; }
+  function fmtDateStr(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function pctChange(curr, prevVal) { if (!prevVal) return null; return Math.round(((curr - prevVal) / prevVal) * 100); }
+
+  function isSkinuvaRow(row) {
+    const brand = (row.brand || '').toLowerCase().trim();
+    const skus = (row.sku || row.skus || '').toUpperCase();
+    const target = 'skinuva'.toLowerCase().trim();
+    const skuPrefix = ('SVA').toUpperCase();
+    return brand === target || (target.length > 3 && brand.endsWith(target.slice(1))) || skus.split(',').some(s => s.trim().startsWith(skuPrefix));
+  }
+  function isValidAmazonRow(row) {
+    const status = (row.status || '').toLowerCase().trim();
+    if (status === 'cancelled' || status === 'pending') return false;
+    if ((row.promotion_ids || '').toLowerCase().includes('vine')) return false;
+    return true;
+  }
+  function isValidWebRow(row) {
+    const status = (row.financial_status || row.status || '').toLowerCase();
+    if (status === 'refunded' || status === 'cancelled' || status === 'canceled') return false;
+    // ADDED 2026-08-25 per Jaclyn -- Ashley Wilcox's orders are internal
+    // Medaltus purchase orders, not real end-customer sales. See the
+    // Website Sales page's isValidRow() for the full comment. (Website is
+    // currently excluded from every Overview KPI/chart per Jaclyn's
+    // 2026-08-25 request, so this has no visible effect right now -- kept
+    // correct in case Website is ever added back to this page.)
+    if ((row.customer_name || '').trim().toLowerCase() === 'ashley wilcox') return false;
+    return true;
+  }
+  function isValidWalmartRow(row) {
+    const status = (row.status || '').toLowerCase().trim();
+    return status !== 'cancelled' && status !== 'canceled';
+  }
+
+  // \u2500\u2500 Goal Tracker (ported from \u00e9volis's Overview page, 2026-09-10) \u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // See the \u00e9volis build-summary notes for the full story; kept the same
+  // function names/shapes so future ports stay recognizable. Skinuva only
+  // needs one card (Amazon) -- Website/Walmart aren't wired up here.
+
+  // Pending orders ARE counted toward a goal (they haven't been returned,
+  // just not yet settled) -- unlike isValidAmazonRow() above, which this
+  // page's other KPIs/tables intentionally use to EXCLUDE pending. Confirmed
+  // by reading isValidAmazonRow() directly rather than assuming a variant
+  // was needed (per the \u00e9volis notes' own warning): Skinuva's does exclude
+  // pending, so this separate function is required here.
+  function goalsIsValidAmazonRow(r) {
+    const status = (r.status || '').toLowerCase().trim();
+    if (status === 'cancelled') return false; // pending IS kept, deliberately
+    if ((r.promotion_ids || '').toLowerCase().includes('vine')) return false;
+    return true;
+  }
+
+  // Small positional CSV parser, kept separate from parseCsv() above (which
+  // keys by header name) because the Goals sheet's header row can't be
+  // trusted for every column -- confirmed live: column S's header row cell
+  // reads "Actual vs Goal - Sales" (leftover from an old use of that
+  // column), but the real "Organic Sales" goal label was instead typed
+  // directly onto the Jun-26 DATA row in that same column, with real
+  // dollar values starting the month after. Reading by fixed column index
+  // sidesteps that entirely. Proper quote-handling for embedded commas
+  // (sheet has values like " $ 74,267 ").
+  function parseCsv2D(text) {
+    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.length > 0);
+    return lines.map(parseCsvLine);
+  }
+  function findGoalsRow(rows, year, month) {
+    const monthAbbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month - 1];
+    const target = `${monthAbbr}-${String(year).slice(2)}`;
+    return rows.find(r => (r[0] || '').trim() === target) || null;
+  }
+  // Real column positions on Skinuva's own Goals sheet, confirmed by
+  // fetching and parsing the actual CSV rather than assumed from \u00e9volis's
+  // layout (which uses different columns entirely -- O/T/AD there vs
+  // N/S/AA here). Re-verify before ever reusing this on another brand.
+  const GOALS_COL_TOTAL   = 13; // N -- "Dollar Sales Goal"
+  const GOALS_COL_ORGANIC = 18; // S -- header cell is stale ("Actual vs Goal - Sales");
+                                //      real "Organic Sales" goal values only reliable Jul-26 onward
+  const GOALS_COL_ADS     = 26; // AA -- "Ads Sales Goal"
+  function parseGoalAmt(v) {
+    if (!v) return null;
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) || n === 0 ? null : n; // null (not 0) means "no goal set" -- see buildGoalGaugeHtml
+  }
+
+  // Plain SVG progress ring -- deliberately not Chart.js. A single-value
+  // gauge doesn't need a charting library, and this page's init function
+  // can run repeatedly (every period-toggle click); SVG just re-renders as
+  // a fresh string each time with nothing to destroy/recreate first.
+  function buildGaugeSvg(pct, colorHex) {
+    const size = 140, stroke = 14, r = (size - stroke) / 2, c = size / 2;
+    const circumference = 2 * Math.PI * r;
+    const clamped = Math.max(0, Math.min(100, pct));
+    const dashOffset = circumference * (1 - clamped / 100);
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);display:block;">
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${stroke}"/>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${colorHex}" stroke-width="${stroke}"
+        stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="butt"/>
+    </svg>`;
+  }
+
+  // One gauge column: ring + center %, metric sublabel, projection/result
+  // line, goal line. `actual` is real dollars so far this period (never
+  // projected -- see the fill-vs-color note below); `goal` is this
+  // period's target from the Goals sheet, or null if none is set.
+  function buildGoalGaugeHtml(metricLabel, actual, goal, cfg, daysInMonth) {
+    if (goal == null || goal <= 0) {
+      return `<div style="text-align:center;">
+        <div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:10px;">${metricLabel}</div>
+        <div style="width:140px;height:140px;margin:0 auto;border-radius:50%;border:14px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;padding:20px;box-sizing:border-box;">No goal set</div>
+      </div>`;
+    }
+    // Fill + center number reflect ACTUAL progress so far -- honest, not
+    // projected. A ring filled to a >100% pace-based projection renders as
+    // a complete circle, which hides that real dollars collected so far
+    // might only be ~40% of the way there. The projection is used ONLY to
+    // pick the ring's color, computed completely separately below.
+    const actualPct = Math.round((actual / goal) * 100);
+    let projected = actual, resultLine;
+    if (cfg.isPartial) {
+      const projectedRatio = cfg.day > 0 ? daysInMonth / cfg.day : 1;
+      projected = actual * projectedRatio;
+      resultLine = 'Projecting $' + Math.round(projected).toLocaleString();
+    } else {
+      // Last Full Month -- the month is over, actual is already final, no
+      // separate projection needed.
+      resultLine = actualPct >= 100 ? 'Hit goal' : 'Missed goal';
+    }
+    const projectedPct = Math.round((projected / goal) * 100);
+    const statusColor = projectedPct >= 100 ? 'var(--green)' : 'var(--danger)';
+    return `<div style="text-align:center;position:relative;">
+      <div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:10px;">${metricLabel}</div>
+      <div style="position:relative;width:140px;height:140px;margin:0 auto;">
+        ${buildGaugeSvg(actualPct, statusColor)}
+        <div style="position:absolute;top:0;left:0;width:140px;height:140px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--navy);font-family:var(--font-subheader);">${actualPct}%</div>
+      </div>
+      <div style="font-size:14px;font-weight:700;color:var(--navy);margin-top:10px;">${resultLine}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--navy);">Goal $${Math.round(goal).toLocaleString()}</div>
+    </div>`;
+  }
+
+  // Aggregates rows whose (normalized) date falls within an inclusive
+  // [startStr, endStr] range \u2014 this is the piece that lets us do true
+  // month-to-date instead of only ever whole calendar months.
+  function aggregateRange(rows, startStr, endStr, validFn) {
+    const filtered = rows.filter(r => {
+      const d = normalizeDate(r.date);
+      return d && d >= startStr && d <= endStr && validFn(r);
+    });
+    const orderIds = new Set(filtered.map(r => r.order_id).filter(Boolean));
+    const totalOrders = orderIds.size;
+    const totalUnits = filtered.reduce((s, r) => s + (parseInt(r.unit_count, 10) || 0), 0);
+    const orderTotals = {};
+    filtered.forEach(r => { if (!r.order_id) return; orderTotals[r.order_id] = (orderTotals[r.order_id] || 0) + parseAmt(r.item_price); });
+    const totalRevenue = Object.values(orderTotals).reduce((s, v) => s + v, 0);
+    const skuSet = new Set(filtered.map(r => (r.sku || '').trim()).filter(Boolean));
+    return { totalUnits, totalOrders, totalRevenue, skuSet, filteredRows: filtered };
+  }
+
+  // Sums unit_count per SKU (stripping the -SF seller-fulfilled suffix so
+  // FBA and SF variants of the same product merge into one row — same
+  // convention used everywhere else in this dashboard).
+  //
+  // Keyed by ASIN, not SKU — per this project's own convention (each
+  // product has an FBA SKU and a separate "-SF" seller-fulfilled SKU;
+  // grouping by SKU alone silently splits a single product into two rows
+  // and undercounts seller-fulfilled sales). ASIN is the same across both
+  // fulfillment types, so it's the safe key here.
+  //
+  // Website/Walmart order rows only ever carry a SKU, never an ASIN. When
+  // that's the case, skuToAsinMap (built from the same product-names sheet,
+  // col B SKU → col A ASIN) resolves it to the real ASIN so it groups with
+  // Amazon's data for the same product instead of becoming its own
+  // separate, unnamed row. Falls back to the raw SKU only if the crosswalk
+  // has no entry for it either.
+  function unitsByAsin(filteredRows, skuToAsinMap) {
+    const map = {};
+    filteredRows.forEach(r => {
+      let key = (r.asin || '').trim().toUpperCase();
+      if (!key) {
+        const sku = (r.sku || '').trim().toUpperCase().replace(/-SF$/i, '');
+        key = (skuToAsinMap && skuToAsinMap[sku]) || sku;
+      }
+      if (!key) return;
+      map[key] = (map[key] || 0) + (parseInt(r.unit_count, 10) || 0);
+    });
+    return map;
+  }
+
+  // ADDED 2026-08-28 per Jaclyn -- "if ACOS goes up that is bad ... that
+  // metric should read red since a low acos is good where an increasing
+  // acos is bad." The arrow direction should still literally follow the
+  // number (\u25b2 when it went up, \u25bc when it went down) -- only the COLOR
+  // needs to flip for a metric where "up" is the bad direction. `invert`
+  // swaps the up/dn CSS class (which controls color) while leaving the
+  // arrow glyph computed from the real, un-inverted sign of pctVal.
+  function setKpi(cardId, value, pctVal, suffix, invert) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const valEl = card.querySelector('.kpi-value');
+    const momEl = card.querySelector('.kpi-mom');
+    if (valEl) valEl.textContent = value;
+    if (momEl) {
+      if (pctVal == null) { momEl.className = 'kpi-mom flat'; momEl.textContent = '\u2014'; return; }
+      const arrow = pctVal === 0 ? '' : pctVal > 0 ? '\u25b2 ' : '\u25bc ';
+      const isGoodDirection = invert ? pctVal < 0 : pctVal > 0;
+      const cls = pctVal === 0 ? 'flat' : isGoodDirection ? 'up' : 'dn';
+      momEl.className = 'kpi-mom ' + cls;
+      momEl.textContent = `${arrow}${Math.abs(pctVal)}%${suffix || ' vs MTD last month'}`;
+    }
+  }
+
+  // For KPIs with no reliable day-level source to build a true MTD-vs-MTD
+  // comparison from (e.g. the ad orders sheet buckets by month only, no
+  // date field) — shows a plain static label instead of a misleading
+  // percentage. Per Jaclyn 2026-07-24: drop the MOM badge rather than
+  // fake a comparison the underlying data can't actually support.
+  function setKpiPlain(cardId, value, label) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const valEl = card.querySelector('.kpi-value');
+    const momEl = card.querySelector('.kpi-mom');
+    if (valEl) valEl.textContent = value;
+    if (momEl) { momEl.className = 'kpi-mom flat'; momEl.textContent = label || ''; }
+  }
+
+  // ── Period selector — Month to Date / Last Month ────────────────────────
+  // ADDED 2026-08-28 per Jaclyn. Overview used to only ever compute "so far
+  // this month" -- there was no "Last Month" concept here at all (unlike
+  // Amazon/Website/Walmart Sales, which already compute several distinct
+  // periods, or PPC Blended, which already computes both 'mtd' and
+  // 'lastFull'). getOverviewPeriodConfig() gives every downstream
+  // computation in this function a single source of truth for "which
+  // month, and is it still in progress" instead of each block reaching
+  // for `new Date()` directly:
+  //   - 'mtd': the current calendar month, up through today -- exactly the
+  //     original (only) behavior, byte-for-byte unchanged.
+  //   - 'lastFull': the most recently COMPLETED calendar month in full
+  //     (matching Amazon Sales' own 'lastFull' pill), compared against the
+  //     full month before that -- no day-of-month truncation on either
+  //     side, since both months are already over.
+  const OV_PERIOD_LABELS = { mtd: 'Month to Date', lastFull: 'Last Month' };
+  window._skinuvaActivePeriod = window._skinuvaActivePeriod || 'mtd';
+
+  // This IIFE (Overview) never had its own getLastFullMonth() -- every
+  // other page that uses this pattern (Amazon/Website/Walmart Sales) defines
+  // it locally inside their OWN separate IIFE, so Overview can't reach
+  // theirs. Without this, selecting "Last Month" would throw a
+  // ReferenceError the first time getOverviewPeriodConfig('lastFull') ran.
+  function getLastFullMonth() {
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth(); // 0-indexed, so this is last month's index
+    if (month === 0) { month = 12; year--; }
+    return { year, month }; // month is 1-indexed
+  }
+
+  function getOverviewPeriodConfig(key) {
+    if (key === 'lastFull') {
+      const { year, month } = getLastFullMonth(); // month before the current one, 1-indexed
+      let prevMonth = month - 1, prevYear = year;
+      if (prevMonth === 0) { prevMonth = 12; prevYear--; }
+      return {
+        key: 'lastFull', label: OV_PERIOD_LABELS.lastFull, isPartial: false,
+        year, month, day: new Date(year, month, 0).getDate(), // last calendar day of that month
+        prevYear, prevMonth, prevDay: new Date(prevYear, prevMonth, 0).getDate(),
+      };
+    }
+    // mtd (default) -- identical to the original hardcoded behavior.
+    const now = new Date();
+    const year = now.getFullYear(), month = now.getMonth() + 1, day = now.getDate();
+    let prevMonth = month - 1, prevYear = year;
+    if (prevMonth === 0) { prevMonth = 12; prevYear--; }
+    return { key: 'mtd', label: OV_PERIOD_LABELS.mtd, isPartial: true, year, month, day, prevYear, prevMonth, prevDay: day };
+  }
+
+  function renderOverviewPeriodPills() {
+    const el = document.getElementById('sk-period-pills');
+    if (!el) return;
+    el.innerHTML = Object.entries(OV_PERIOD_LABELS).map(([key, label]) =>
+      `<button class="period-pill${key === window._skinuvaActivePeriod ? ' active' : ''}" onclick="window.__skinuvaSelectPeriod('${key}')">${label}</button>`
+    ).join('');
+  }
+  window.__skinuvaSelectPeriod = function (key) {
+    window._skinuvaActivePeriod = key;
+    renderOverviewPeriodPills();
+    window.initSkinuvaOverviewLive(key);
+  };
+
+  window.initSkinuvaOverviewLive = async function (periodKey) {
+    const activeKey = periodKey || window._skinuvaActivePeriod || 'mtd';
+    window._skinuvaActivePeriod = activeKey;
+    renderOverviewPeriodPills();
+    // Idempotent PER PERIOD, same convention as every other initXLive() in
+    // this file ("calling it again on repeat tab visits is just a cheap
+    // early-return, not a duplicate fetch") -- but a genuine period switch
+    // is a deliberate re-render, not a repeat visit, so it must go through.
+    if (window._skinuvaLiveInit === activeKey) return;
+    window._skinuvaLiveInit = activeKey;
+    console.log('[Skinuva] initOverviewLive() called -- period:', activeKey);
+
+    const cfg = getOverviewPeriodConfig(activeKey);
+
+    const AMAZON_SHEET_ID = '1SiYu8e2-Pfi14Aiuf6SAFytWVXb4_dtdNFT6wvLFPok'; const AMAZON_GID = '39113380';
+    const WEB_SHEET_ID    = '1mjMQXycVu87z8K7chHiTILQTn_EAd29fEhWXcjOxKzk'; const WEB_GID    = '597852778';
+    const WMT_SHEET_ID    = '1oIZDxN0vSf4nRvE_K95lsNyBWQd4Ef2aARm0RUtvE0Y'; const WMT_GID    = '761373905';
+    const AD_ORDERS_SHEET_ID = '1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI'; const AD_ORDERS_GID = '2118939572';
+    // Added 2026-08-06 per Jaclyn — Walmart's ad data sheets.
+    const WALMART_AD_ORDERS_SHEET_ID   = '1PYUPePnhnBJp77n3HVSKeM824ZorAMkiJC8WFbyORCU'; const WALMART_AD_ORDERS_GID   = '475994650'; // skinuva tab
+    const WALMART_ADVERTISING_SHEET_ID = '1H1mAYxu8udO7vuCPGs8u0iVzHaRh0wbHb4PyIka4pUU'; const WALMART_ADVERTISING_GID = '426170012'; // skinuva tab
+    const AMZ_REVENUE_SHEET_ID = '1equxdiqpzonA5TgsrKzbrpq92QHyJP8kQ2RoUiYmank'; const AMZ_REVENUE_GID = '490789068';
+    const WEB_REVENUE_GID = '7000599';
+    const WMT_REVENUE_SHEET_ID = '1QhKeOxKR0mEfSiM2pdYxrEBWsQdRSxbL8Q86MP6lpFE'; const WMT_REVENUE_GID = '1506655072';
+    // Website (Google) ads data — same workbook as Website orders/returns.
+    // "ads" tab (campaign-level daily) and "shopping" tab (SKU-level, PMAX
+    // campaigns only). Added 2026-08-05 per Jaclyn.
+    const WEB_ADS_GID = '219707263';
+    const WEB_SHOPPING_GID = '923252595';
+    // Advertising Cache (sp_/sb_/sd_ breakdown columns) — added 2026-09-11
+    // per Jaclyn for the Ad Spend by Type card. Overview never fetched this
+    // sheet before; declared as its own local const here rather than
+    // sharing scope with the PPC page's copy of this same sheet, per this
+    // file's per-<script>-block convention (each block/IIFE re-declares its
+    // own locals even when reading the same window.SHEET_CFG entry).
+    const AD_SUMMARY_SHEET_ID = '13cN301QZxkEGy6-8LfdzB8zmsHhUKwZqz6lsXKUJcnI'; const AD_SUMMARY_GID = '1017226840';
+
+    // `now` stays literal wall-clock "today" -- still needed below for
+    // things that are genuinely period-independent (the trailing-6-months
+    // revenue trend chart, cache-busting timestamps). Everything that
+    // means "the month we're computing this page for" now reads from
+    // `cfg` instead, so it moves with the period toggle.
+    const now = new Date();
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const daysElapsed = cfg.day;
+    const mtdStartStr = fmtDateStr(new Date(cfg.year, cfg.month - 1, 1));
+    const mtdEndStr   = fmtDateStr(new Date(cfg.year, cfg.month - 1, cfg.day));
+    const prevStartStr = fmtDateStr(new Date(cfg.prevYear, cfg.prevMonth - 1, 1));
+    const prevEndStr   = fmtDateStr(new Date(cfg.prevYear, cfg.prevMonth - 1, cfg.prevDay));
+    // Reference year/month/prev used everywhere below that matches against
+    // a pre-aggregated MONTHLY sheet by exact (year, month) integers rather
+    // than a date-string range (ad-driven orders, per-ASIN ad units,
+    // Walmart ad spend) -- these used to just read `now`/`lastMonthYear`
+    // directly; now they read the selected period's own reference month.
+    const refYear = cfg.year, refMonth = cfg.month;
+    const lastMonthYear = cfg.prevYear, lastMonthNum = cfg.prevMonth;
+
+    const titleEl = document.getElementById('sk-donut-title');
+    if (titleEl) titleEl.textContent = `Revenue by Channel \u2014 ${monthNames[cfg.month - 1]} ${cfg.year}${cfg.isPartial ? ' MTD' : ''}`;
+    const channelBreakSuffixEl = document.getElementById('sk-channelbreak-title-suffix');
+    if (channelBreakSuffixEl) channelBreakSuffixEl.textContent = `(Amazon + Walmart, ${cfg.label})`;
+    const topProductsSuffixEl = document.getElementById('sk-topproducts-title-suffix');
+    if (topProductsSuffixEl) topProductsSuffixEl.textContent = `(by Units, Amazon + Walmart, ${cfg.label})`;
+    const heroRevLblEl = document.getElementById('sk-hero-revenue-lbl');
+    if (heroRevLblEl) heroRevLblEl.textContent = cfg.isPartial ? 'Month-to-Date Revenue' : 'Last Month\u2019s Revenue';
+
+    // Swap the 4 "MTD ..." KPI card labels for a period-neutral label when
+    // viewing a completed month, and build the shared MOM-suffix string
+    // used by the setKpi() calls further down (was hardcoded ' vs MTD
+    // last month (Est.)' everywhere -- only correct for the mtd period).
+    const OV_KPI_LABELS = {
+      'sk-kpi-organic-orders': cfg.isPartial ? 'MTD Organic Units' : 'Organic Units',
+      'sk-kpi-organic-sales':  cfg.isPartial ? 'MTD Organic Sales' : 'Organic Sales',
+      'sk-kpi-ad-orders':      cfg.isPartial ? 'MTD Ad-Driven Units' : 'Ad-Driven Units',
+      'sk-kpi-ad-sales':       cfg.isPartial ? 'MTD Ad Sales' : 'Ad Sales',
+    };
+    Object.entries(OV_KPI_LABELS).forEach(([id, text]) => {
+      const card = document.getElementById(id);
+      const lblEl = card && card.querySelector('.kpi-label');
+      if (lblEl) lblEl.textContent = text;
+    });
+    const ovMomSuffix = cfg.isPartial ? ' vs MTD last month (Est.)' : ' vs prior month';
+    const ovMomSuffixReal = cfg.isPartial ? ' vs MTD last month' : ' vs prior month';
+
+    try {
+      // Added 2026-08-03 per Jaclyn: net MTD revenue/units against actual
+      // returns rather than only gross order data. Returns sheets are
+      // fetched alongside the existing 4 — OV_RETURNS_SHEET_ID /
+      // OV_WMT_RETURNS_SHEET_ID / OV_WEB_ORDERS_SHEET_ID + their gids are
+      // already declared globally further down this file (used by the
+      // existing "Returns Processed" KPI on Marketing → Fulfillment & CS),
+      // reused here rather than redeclared.
+      // ADDED 2026-08-28 per Jaclyn's "thorough QA" request -- Skinuva-CA
+      // orders/returns live on DEDICATED tabs (same 2 files, different
+      // gids), split out 2026-08-19 per the Amazon Sales page's own
+      // history (see its "Merge in the skinuva-ca tabs" comment) -- but
+      // that split was only ever wired into the Amazon Sales page's own
+      // fetch, never into Overview's. Confirmed live: this silently
+      // dropped 100% of Canada's Amazon orders/units/revenue from every
+      // Overview KPI, the Channel Breakdown table, and Top Selling
+      // Products -- not a deliberate US-only scope, just a page that
+      // never got updated when the CA split happened. Same gids the
+      // Amazon Sales page uses (hardcoded there too, not in SHEET_CFG).
+      const CA_SYNC_GID = '1347068338';
+      const CA_RETURNS_GID = '2019659648';
+      const CA_AD_ORDERS_GID = '1657515163';
+      const [amzCsv, webCsv, wmtCsv, adOrdersCsv, amzReturnsCsv, wmtReturnsCsv, webReturnsCsv, namesCsv, webAdsCsv, webShoppingCsv, caSyncCsv, caReturnsCsv, caAdOrdersCsv, adSummaryCsv] = await Promise.all([
+        fetch(sheetCsvUrl(AMAZON_SHEET_ID, AMAZON_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(WEB_SHEET_ID, WEB_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(WMT_SHEET_ID, WMT_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(AD_ORDERS_SHEET_ID, AD_ORDERS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(ovCsvUrl(OV_RETURNS_SHEET_ID, OV_RETURNS_SKINUVA_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(ovCsvUrl(OV_WMT_RETURNS_SHEET_ID, OV_WMT_RETURNS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(ovCsvUrl(OV_WEB_ORDERS_SHEET_ID, OV_WEB_RETURNS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Product names + SKU→ASIN crosswalk — col A = ASIN, col B = SKU (base,
+        // no -SF), col C = Name. Moved into this parallel batch 2026-08-05 (was
+        // previously fetched later, after returns netting had already run) so
+        // skuToAsinMap exists in time to resolve Website/Walmart RETURN rows
+        // (which only ever carry a SKU, never an ASIN) to the same ASIN key
+        // used everywhere else on this page.
+        fetch(sheetCsvUrl('1NNRTRQxQl2r4XivAvH700CC39p49GD2xfZlyRNqahGA', '164358627') + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Website (Google Ads) spend/orders — added 2026-08-05 per Jaclyn.
+        // Same workbook as Website orders/returns (OV_WEB_ORDERS_SHEET_ID),
+        // "ads" tab: date, campaign_name, impressions, clicks, spend,
+        // conversions, revenue, acos, last_updated. Real day-level data
+        // (unlike Amazon's month-bucketed ad_orders sheet), so this needs no
+        // proration — a true MTD sum is possible directly.
+        fetch(sheetCsvUrl(OV_WEB_ORDERS_SHEET_ID, WEB_ADS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Website (Google Shopping/PMAX) orders by SKU — "shopping" tab: date,
+        // item_id, product_title, impressions, clicks, spend, conversions,
+        // conversions_value, acos, last_updated, SKU. Per Jaclyn: PMAX is the
+        // only Google campaign type with SKU-level data, so it's the best
+        // available source for per-ASIN Website ad units (not a full picture
+        // of every Google campaign type).
+        fetch(sheetCsvUrl(OV_WEB_ORDERS_SHEET_ID, WEB_SHOPPING_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Skinuva-CA orders/returns — same 2 files as above, dedicated
+        // CA-only tabs (see comment above CA_SYNC_GID/CA_RETURNS_GID).
+        fetch(sheetCsvUrl(AMAZON_SHEET_ID, CA_SYNC_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(ovCsvUrl(OV_RETURNS_SHEET_ID, CA_RETURNS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Skinuva-CA ad orders (per-ASIN, month-bucketed) — same file as
+        // adOrdersCsv below (AD_ORDERS_SHEET_ID), dedicated CA gid. Rows
+        // carry brand:"skinuva-ca" (confirmed live), normalized back to
+        // BRAND_SLUG on merge below so the existing brand filters at each
+        // adOrdersCsv consumer keep working unchanged.
+        fetch(sheetCsvUrl(AD_ORDERS_SHEET_ID, CA_AD_ORDERS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Advertising Cache — sp_/sb_/sd_ spend/sales/units/acos/campaigns
+        // columns, for the Ad Spend by Type card (see AD_SUMMARY_SHEET_ID
+        // above).
+        fetch(sheetCsvUrl(AD_SUMMARY_SHEET_ID, AD_SUMMARY_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+      ]);
+
+      const amzRows = isCsv(amzCsv) ? parseCsv(amzCsv).filter(isSkinuvaRow) : [];
+      // Merge in the skinuva-ca tab — every row unconditionally tagged CA
+      // (not run through any territory classifier, since the whole tab is
+      // CA-dedicated now), matching the Amazon Sales page's own "Merge in
+      // the skinuva-ca tabs" convention (see that page's fetch code).
+      const caSyncRows = isCsv(caSyncCsv) ? parseCsv(caSyncCsv).filter(isSkinuvaRow) : [];
+      caSyncRows.forEach(r => { r._territory = 'CA'; });
+      amzRows.push(...caSyncRows);
+      console.log('[Skinuva][overview][CA-merge] caSyncRows:', caSyncRows.length, 'caReturnRows pending merge below');
+
+      // Merged Ad Orders rows (US main tab + Skinuva-CA dedicated tab).
+      // Every consumer of adOrdersCsv below (Ad-Driven Units KPI,
+      // adUnitsByAsin organic-split, Ad Spend/ACOS proration) should see
+      // CA's ad spend/sales/ad_units too, not just US. CA rows' brand is
+      // normalized from "skinuva-ca" to BRAND_SLUG here so each existing
+      // brand-equality filter downstream keeps working without any other
+      // changes at those call sites.
+      const adOrdersRowsMerged = (isCsv(adOrdersCsv) ? parseCsv(adOrdersCsv) : []).concat(
+        (isCsv(caAdOrdersCsv) ? parseCsv(caAdOrdersCsv) : []).map(r => {
+          r._territory = 'CA';
+          r.brand = 'skinuva';
+          return r;
+        })
+      );
+      console.log('[Skinuva][overview][CA-merge] caAdOrdersCsv rows merged into adOrders:', adOrdersRowsMerged.length - (isCsv(adOrdersCsv) ? parseCsv(adOrdersCsv).length : 0));
+      // Customer-only (C-) filter added 2026-08-10 per Jaclyn — Skinuva's
+      // website orders also include Physician (P-), International (I-),
+      // and Sample (S-) order types mixed into the same sheet. Overview
+      // page revenue/units/Active SKUs should only ever reflect Customer
+      // orders, matching the same scope as the Sales > Website > Customer
+      // tab and the PDF export's "Website (Customer)" checkbox. This is
+      // Skinuva-specific — do not replicate to other brands by default.
+      const webRows = isCsv(webCsv) ? parseCsv(webCsv).filter(r => (r.sku || '').trim().toUpperCase().startsWith('C-')) : [];
+      const wmtRows = isCsv(wmtCsv) ? parseCsv(wmtCsv) : [];
+      console.log('[Skinuva][overview] row counts \u2014 amazon:', amzRows.length, 'web:', webRows.length, 'walmart:', wmtRows.length, '\u2014 MTD range:', mtdStartStr, 'to', mtdEndStr);
+
+      // Product names + SKU→ASIN crosswalk (see fetch comment above).
+      let asinNameMap = {};
+      let skuToAsinMap = {};
+      let walmartItemIdToAsinMap = {}; // added 2026-08-06 per Jaclyn, for Walmart ad-units below
+      try {
+        if (isCsv(namesCsv)) {
+          const lines = namesCsv.trim().split('\n');
+          for (let i = 1; i < lines.length; i++) {
+            const cols = parseCsvLine(lines[i]);
+            const asin = (cols[0] || '').replace(/^"|"$/g, '').trim().toUpperCase();
+            const sku = (cols[1] || '').replace(/^"|"$/g, '').trim().toUpperCase().replace(/-SF$/i, '');
+            const name = (cols[2] || '').replace(/^"|"$/g, '').trim();
+            const walmartItemId = (cols[8] || '').replace(/^"|"$/g, '').trim();
+            if (asin && name) asinNameMap[asin] = name;
+            if (sku && asin) skuToAsinMap[sku] = asin;
+            if (walmartItemId && asin) walmartItemIdToAsinMap[walmartItemId] = asin;
+          }
+          console.log('[Skinuva][overview] product name lookup: ', Object.keys(asinNameMap).length, 'ASINs,', Object.keys(skuToAsinMap).length, 'SKU→ASIN mappings,', Object.keys(walmartItemIdToAsinMap).length, 'Walmart Item ID→ASIN mappings');
+        }
+      } catch (e) { console.warn('[Skinuva][overview] product name lookup failed:', e.message); }
+
+      // Average Amazon item_price per ASIN, built from the Amazon Orders sheet
+      // rows already fetched above. Added 2026-08-05 per Jaclyn: Amazon's
+      // Returns report (OV_RETURNS_SHEET_ID) has NO dollar field at all —
+      // confirmed columns are return_date, order_id, sku, asin, fnsku,
+      // product_name, quantity, fulfillment_center_id, detailed_disposition,
+      // reason, status, license_plate_number, customer_comments, brand,
+      // last_updated, order_date — quantity only, never a refund amount. Per
+      // Jaclyn: estimate the dollar impact of each Amazon return as
+      // (returned quantity × that ASIN's item_price from the Orders sheet).
+      // Averaged across all fetched order rows for that ASIN rather than
+      // "most recent" to smooth out promo/coupon price swings on any single
+      // order.
+      function buildAsinPriceMap(rows) {
+        const sums = {}, counts = {};
+        rows.forEach(r => {
+          const asin = (r.asin || '').trim().toUpperCase();
+          const price = parseAmt(r.item_price);
+          if (!asin || !price) return;
+          sums[asin] = (sums[asin] || 0) + price;
+          counts[asin] = (counts[asin] || 0) + 1;
+        });
+        const avg = {};
+        Object.keys(sums).forEach(k => { avg[k] = sums[k] / counts[k]; });
+        return avg;
+      }
+      // Website (Google Ads) MTD and prior-MTD totals — computed once, up
+      // front, since both the Ad-Driven Orders KPI and the Ad Spend/Blended
+      // ACOS KPI need them. Both are true day-level sums (no proration
+      // needed on the Website side, unlike Amazon's monthly-bucketed data).
+      const amzPriceByAsin = buildAsinPriceMap(amzRows);
+
+      // Website (Google) ads data — see fetch comments above for tab/column
+      // details. Both tabs are real day-level data (unlike Amazon's
+      // month-bucketed ad_orders sheet), so true MTD sums are possible
+      // directly — no proration needed on the Website side.
+      const webAdsRows = isCsv(webAdsCsv) ? parseCsv(webAdsCsv) : [];
+      const webShoppingRows = isCsv(webShoppingCsv) ? parseCsv(webShoppingCsv) : [];
+
+      // Sums spend/revenue/conversions from the "ads" tab within a date
+      // range. `conversions` can be fractional (Google's attribution model
+      // spreads partial credit across campaigns) so it's kept as a float
+      // here and only rounded once, at the point it's displayed as a whole
+      // "orders" count.
+      function sumWebAdsRange(rows, startStr, endStr) {
+        let spend = 0, revenue = 0, conversions = 0;
+        rows.forEach(r => {
+          const d = normalizeDate(r.date);
+          if (!d || d < startStr || d > endStr) return;
+          spend += parseAmt(r.spend);
+          revenue += parseAmt(r.revenue);
+          conversions += parseFloat(r.conversions) || 0;
+        });
+        return { spend, revenue, conversions };
+      }
+
+      // Per-ASIN Website ad units from the "shopping" tab (PMAX only — the
+      // only Google campaign type with SKU-level data, per Jaclyn). Column
+      // is literally "SKU" (uppercase) on this tab, unlike everywhere else
+      // on this page — checked defensively (r.SKU || r.sku) since a header
+      // casing mismatch is exactly the kind of thing that silently breaks
+      // this page (see Amazon returns $ field, fixed 2026-08-05).
+      function webShoppingUnitsByAsin(rows, startStr, endStr, skuMap) {
+        const map = {};
+        rows.forEach(r => {
+          const d = normalizeDate(r.date);
+          if (!d || d < startStr || d > endStr) return;
+          const sku = (r.SKU || r.sku || '').trim().toUpperCase().replace(/-SF$/i, '');
+          if (!sku) return;
+          const key = (skuMap && skuMap[sku]) || sku;
+          map[key] = (map[key] || 0) + (parseFloat(r.conversions) || 0);
+        });
+        Object.keys(map).forEach(k => { map[k] = Math.round(map[k]); });
+        return map;
+      }
+
+      // Website (Google Ads) MTD and prior-MTD totals — computed once, up
+      // front, since both the Ad-Driven Orders KPI and the Ad Spend/Blended
+      // ACOS KPI need them below. Both are true day-level sums (no
+      // proration needed on the Website side, unlike Amazon's
+      // monthly-bucketed ad_orders data).
+      const webAdsMtd = sumWebAdsRange(webAdsRows, mtdStartStr, mtdEndStr);
+      const webAdsPrevMtd = sumWebAdsRange(webAdsRows, prevStartStr, prevEndStr);
+
+      // ── Returns netting ──────────────────────────────────────────────
+      // Dated by when the RETURN happened (return_date/refund_date), not
+      // when the original order was placed — same convention already
+      // established by the existing "Returns Processed" KPI (Marketing →
+      // Fulfillment & CS / mfcLoadReturns()). Brand-filtered via the same
+      // isSkinuvaRow() check used everywhere else in this
+      // file, since these are shared, multi-brand sheets.
+      //
+      // FIELD NAMES: Walmart (quantity, refund_amount, return_date) and
+      // Website/Shopify (quantity, refund_amount, refund_date) are BOTH
+      // CONFIRMED — see the comments on OV_WMT_RETURNS_GID / OV_WEB_RETURNS_GID
+      // further down this file. Amazon's Returns sheet is ALSO confirmed as
+      // of 2026-08-05 (fetched and inspected directly): return_date,
+      // order_id, sku, asin, fnsku, product_name, quantity,
+      // fulfillment_center_id, detailed_disposition, reason, status,
+      // license_plate_number, customer_comments, brand, last_updated,
+      // order_date — there is NO dollar/refund-amount column on the Amazon
+      // side at all (Amazon's FBA returns report only ever tracks units,
+      // never $). Per Jaclyn (2026-08-05): estimate each Amazon return's
+      // dollar impact as (returned quantity × that ASIN's average
+      // item_price, pulled from the Amazon Orders sheet — see
+      // amzPriceByAsin above) rather than trying to read a $ field that
+      // doesn't exist.
+      //
+      // byAsin: also builds a per-ASIN returned-quantity map, used further
+      // down to net Active SKUs and the Top Selling Products table. Amazon
+      // rows carry their own `asin` column directly; Walmart/Website rows
+      // only ever carry a `sku`, so those are resolved through
+      // skuToAsinMap (falling back to the raw SKU if no crosswalk entry
+      // exists) — same convention as unitsByAsin() elsewhere on this page.
+      // `csv` may be a raw CSV string (the original convention) OR an
+      // already-parsed array of rows -- ADDED 2026-08-28 so the CA-merge
+      // fix below can pass a combined [US rows, CA rows] array without
+      // gluing two CSV texts together (which would duplicate the header
+      // row and break parseCsv).
+      function aggregateReturnsRange(csv, startStr, endStr, dateField, opts) {
+        opts = opts || {};
+        if (!Array.isArray(csv) && !isCsv(csv)) return { totalQty: 0, totalAmt: 0, byAsin: {} };
+        const filtered = (Array.isArray(csv) ? csv : parseCsv(csv)).filter(r => {
+          if (!isSkinuvaRow(r)) return false;
+          if (opts.skuPrefix && !(r.sku || '').trim().toUpperCase().startsWith(opts.skuPrefix)) return false;
+          const d = normalizeDate(r[dateField]);
+          return d && d >= startStr && d <= endStr;
+        });
+        let totalQty = 0, totalAmt = 0;
+        const byAsin = {};
+        filtered.forEach(r => {
+          const qty = parseInt(r.quantity, 10) || 0;
+          totalQty += qty;
+          let key = (r.asin || '').trim().toUpperCase();
+          if (!key) {
+            const sku = (r.sku || '').trim().toUpperCase().replace(/-SF$/i, '');
+            key = (skuToAsinMap && skuToAsinMap[sku]) || sku;
+          }
+          if (key) byAsin[key] = (byAsin[key] || 0) + qty;
+          totalAmt += opts.useAsinPrice ? qty * (amzPriceByAsin[key] || 0) : parseAmt(r.refund_amount);
+        });
+        return { totalQty, totalAmt, byAsin };
+      }
+
+      // Merge Skinuva-CA returns into the same rows array before
+      // aggregating — aggregateReturnsRange accepts either a raw CSV
+      // string or an already-parsed row array (Array.isArray check),
+      // added specifically so this US+CA merge doesn't require
+      // concatenating raw CSV text (which would duplicate header rows).
+      const amzReturnRowsAll = (isCsv(amzReturnsCsv) ? parseCsv(amzReturnsCsv) : []).concat(
+        (isCsv(caReturnsCsv) ? parseCsv(caReturnsCsv) : []).map(r => { r._territory = 'CA'; return r; })
+      );
+      console.log('[Skinuva][overview][CA-merge] caReturnRows:', amzReturnRowsAll.filter(r => r._territory === 'CA').length);
+      const amzReturnsMtd  = aggregateReturnsRange(amzReturnRowsAll, mtdStartStr, mtdEndStr, 'return_date', { useAsinPrice: true });
+      const amzReturnsPrev = aggregateReturnsRange(amzReturnRowsAll, prevStartStr, prevEndStr, 'return_date', { useAsinPrice: true });
+      const wmtReturnsMtd  = aggregateReturnsRange(wmtReturnsCsv, mtdStartStr, mtdEndStr, 'return_date');
+      const wmtReturnsPrev = aggregateReturnsRange(wmtReturnsCsv, prevStartStr, prevEndStr, 'return_date');
+      const webReturnsMtd  = aggregateReturnsRange(webReturnsCsv, mtdStartStr, mtdEndStr, 'refund_date', { skuPrefix: 'C-' });
+      const webReturnsPrev = aggregateReturnsRange(webReturnsCsv, prevStartStr, prevEndStr, 'refund_date', { skuPrefix: 'C-' });
+      console.log('[Skinuva][overview] returns this MTD \u2014 amazon:', amzReturnsMtd, 'walmart:', wmtReturnsMtd, 'website:', webReturnsMtd);
+
+      const amzMtd = aggregateRange(amzRows, mtdStartStr, mtdEndStr, isValidAmazonRow);
+      const webMtd = aggregateRange(webRows, mtdStartStr, mtdEndStr, isValidWebRow);
+      const wmtMtd = aggregateRange(wmtRows, mtdStartStr, mtdEndStr, isValidWalmartRow);
+      const amzPrev = aggregateRange(amzRows, prevStartStr, prevEndStr, isValidAmazonRow);
+      const webPrev = aggregateRange(webRows, prevStartStr, prevEndStr, isValidWebRow);
+      const wmtPrev = aggregateRange(wmtRows, prevStartStr, prevEndStr, isValidWalmartRow);
+
+      // Net revenue/units against returns dated in the same window (see
+      // returns-netting block above). Deliberately NOT applied to order
+      // COUNT — these returns sheets are quantity/line-item-level, not a
+      // "this whole order was cancelled" flag, so there's no clean way to
+      // decrement an order count from them without assuming every return
+      // means a fully-cancelled order, which isn't true for partial
+      // returns. Order counts below stay gross. Also NOT applied to the
+      // per-ASIN Top Selling Products table further down (that would need
+      // each return row mapped SKU→ASIN too — a separate, larger change;
+      // flag if that\u2019s wanted next).
+      const amzMtdNetRevenue = amzMtd.totalRevenue - amzReturnsMtd.totalAmt;
+      const webMtdNetRevenue = webMtd.totalRevenue - webReturnsMtd.totalAmt;
+      const wmtMtdNetRevenue = wmtMtd.totalRevenue - wmtReturnsMtd.totalAmt;
+      const amzPrevNetRevenue = amzPrev.totalRevenue - amzReturnsPrev.totalAmt;
+      const webPrevNetRevenue = webPrev.totalRevenue - webReturnsPrev.totalAmt;
+      const wmtPrevNetRevenue = wmtPrev.totalRevenue - wmtReturnsPrev.totalAmt;
+      const amzMtdNetUnits = Math.max(0, amzMtd.totalUnits - amzReturnsMtd.totalQty);
+      const webMtdNetUnits = Math.max(0, webMtd.totalUnits - webReturnsMtd.totalQty);
+      const wmtMtdNetUnits = Math.max(0, wmtMtd.totalUnits - wmtReturnsMtd.totalQty);
+      const amzPrevNetUnits = Math.max(0, amzPrev.totalUnits - amzReturnsPrev.totalQty);
+      const webPrevNetUnits = Math.max(0, webPrev.totalUnits - webReturnsPrev.totalQty);
+      const wmtPrevNetUnits = Math.max(0, wmtPrev.totalUnits - wmtReturnsPrev.totalQty);
+
+      const mtd  = { units: amzMtdNetUnits + wmtMtdNetUnits, orders: amzMtd.totalOrders + wmtMtd.totalOrders, revenue: amzMtdNetRevenue + wmtMtdNetRevenue };
+      const prev = { units: amzPrevNetUnits + wmtPrevNetUnits, orders: amzPrev.totalOrders + wmtPrev.totalOrders, revenue: amzPrevNetRevenue + wmtPrevNetRevenue };
+      const aov = mtd.orders ? mtd.revenue / mtd.orders : 0;
+      const aovPrev = prev.orders ? prev.revenue / prev.orders : 0;
+
+      // ADDED 2026-08-25 per Jaclyn -- Total Sales KPI, Amazon + Walmart
+      // only (mtd.revenue/prev.revenue are already scoped that way, per
+      // her earlier request to exclude Website from every Overview
+      // metric).
+      setKpi('sk-kpi-total-sales', '$' + mtd.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 }), pctChange(mtd.revenue, prev.revenue), ovMomSuffixReal);
+      setKpi('sk-kpi-units',  mtd.units.toLocaleString(),  pctChange(mtd.units, prev.units), ovMomSuffixReal);
+      setKpi('sk-kpi-orders', mtd.orders.toLocaleString(), pctChange(mtd.orders, prev.orders), ovMomSuffixReal);
+      setKpi('sk-kpi-aov',    '$' + aov.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), pctChange(Math.round(aov * 100), Math.round(aovPrev * 100)), ovMomSuffixReal);
+
+      // -- MTD Ad-Driven Orders / Pending Orders --
+      // Amazon: per Jaclyn (2026-07-24), the ad orders cron runs daily and
+      // captures every order, but only buckets by month — no day-of-purchase
+      // field — so a true day-level MTD-vs-MTD comparison isn't possible.
+      // No MOM badge there solves that: the current month's row count IS
+      // already "so far this month" by construction (the cron only ever
+      // adds today's orders as they happen), no proration needed. Each row
+      // is one order-level event (confirmed by Jaclyn), not a
+      // pre-aggregated units total, so counting rows = the actual
+      // ad-driven order count directly.
+      // Website: added 2026-08-05 per Jaclyn — Google Ads' "ads" tab is
+      // real day-level data, so its `conversions` column is simply summed
+      // over the MTD window (see webAdsMtd above) and added to Amazon's
+      // count for one blended figure. No MOM here either, to avoid mixing
+      // an exact Website sum with Amazon's monthly-bucketed estimate.
+      let adDrivenOrders = 0;
+      let adDrivenOrdersLastMonthFull = 0;
+      // FIXED 2026-08-28 per Jaclyn -- lastMonthYear/lastMonthNum are now
+      // set once, up top, from the selected period's own cfg (refYear/
+      // refMonth are that same cfg's "current" side) -- this used to
+      // always mean literal today's month/last month regardless of what
+      // period was selected, which is exactly the class of bug that would
+      // have left this one card silently stuck on live data while every
+      // other card on the page switched to Last Month.
+      // FIXED 2026-08-28 per Jaclyn -- "why are we seeing only 16 ad
+      // driven units." This sheet is monthly-grain per ASIN (one row per
+      // ASIN per month, with its own ad_units/spend/sales/acos columns)
+      // -- confirmed live: August had 16 rows (16 ASINs with ad activity),
+      // and .length was counting THOSE ROWS as if each were one order,
+      // instead of summing their ad_units column (which totals 436 for
+      // the same 16 rows). Every other place in this file that reads this
+      // exact sheet (Amazon Sales page's buildTopProductsTable, the Prime
+      // Day comparison, etc.) already sums ad_units per row -- this was
+      // the one place still treating it as one-row-per-order. The old
+      // "not a pre-aggregated units total" comment here no longer matches
+      // the sheet's real shape.
+      if (adOrdersRowsMerged.length) {
+        const adRowsForOrders = adOrdersRowsMerged;
+        const sumAdUnits = rows => rows.reduce((s, r) => s + (parseInt(String(r.ad_units || '').replace(/^'/, ''), 10) || 0), 0);
+        adDrivenOrders = sumAdUnits(adRowsForOrders.filter(r =>
+          parseInt(r.year, 10) === refYear &&
+          parseInt(r.month, 10) === refMonth &&
+          (r.brand || '').trim().toLowerCase() === 'skinuva'.toLowerCase()
+        ));
+        adDrivenOrdersLastMonthFull = sumAdUnits(adRowsForOrders.filter(r =>
+          parseInt(r.year, 10) === lastMonthYear &&
+          parseInt(r.month, 10) === lastMonthNum &&
+          (r.brand || '').trim().toLowerCase() === 'skinuva'.toLowerCase()
+        ));
+      }
+
+      // Walmart — added 2026-08-06 per Jaclyn, explicit choice: sum
+      // ad_units from SHEET_WALMART_AD_ORDERS and add it into this same
+      // blended figure, same as Amazon's real order count and Website's
+      // real conversion count. This means the figure is a mix of true
+      // order counts (Amazon, Website) and an ad-attributed UNIT count
+      // (Walmart) — a deliberate simplicity tradeoff, not an oversight.
+      // Walmart's sheet only ever contains rows with real spend
+      // (zero-spend rows filtered server-side), so every unit here
+      // reflects genuine ad activity.
+      let walmartAdUnitsThisMonth = 0;
+      try {
+        const wmtAdOrdersCsvForOrders = await fetch(sheetCsvUrl(WALMART_AD_ORDERS_SHEET_ID, WALMART_AD_ORDERS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => '');
+        if (isCsv(wmtAdOrdersCsvForOrders)) {
+          walmartAdUnitsThisMonth = parseCsv(wmtAdOrdersCsvForOrders)
+            .filter(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth)
+            .reduce((s, r) => s + (parseInt(String(r.ad_units || '').replace(/^'/, ''), 10) || 0), 0);
+        }
+      } catch (e) { console.warn('[Skinuva][overview] Walmart ad units (for Ad-Driven Orders) lookup failed:', e.message); }
+
+      setKpiPlain('sk-kpi-ad-orders', (adDrivenOrders + walmartAdUnitsThisMonth).toLocaleString(), (cfg.isPartial ? 'This month' : 'Last month') + ' (Amazon + Walmart ad units)');
+      // NOTE: this card's own MOM/"Organic Orders" companion logic moved
+      // further down — see "MTD Organic Units" below, after per-ASIN net
+      // units and ad-attributed units are available. Per Jaclyn
+      // (2026-08-05): that KPI switched from an order count to a UNITS
+      // figure so returned units can actually be subtracted from it (the
+      // returns sheets are line-item/qty level, not a "whole order
+      // cancelled" flag, so there was no clean way to net an order COUNT
+      // against them).
+
+      // Pending Orders — a live snapshot, intentionally NOT date-scoped
+      // (an order still sitting in Pending from any date is still open and
+      // worth surfacing, not just ones placed this month). Amazon only,
+      // per Jaclyn's source (SHEET_ORDERS).
+      const pendingOrderIds = new Set(
+        amzRows.filter(r => (r.status || '').trim().toLowerCase() === 'pending')
+               .map(r => r.order_id).filter(Boolean)
+      );
+      setKpiPlain('sk-kpi-pending', pendingOrderIds.size.toLocaleString(), 'Currently open');
+
+      const heroRevEl = document.getElementById('sk-hero-revenue');
+      if (heroRevEl) heroRevEl.textContent = mtd.revenue >= 1000 ? '$' + (mtd.revenue / 1000).toFixed(1) + 'K' : '$' + mtd.revenue.toFixed(0);
+
+      // -- Combined product table: units per ASIN per channel, MTD, with MOM + Amazon ads/organic split --
+      // asinNameMap / skuToAsinMap were already built earlier (up front,
+      // before returns netting needed them too).
+      //
+      // Added 2026-08-05 per Jaclyn: net each channel's per-ASIN units
+      // against that same channel's returns (amzReturnsMtd.byAsin /
+      // wmtReturnsMtd.byAsin / webReturnsMtd.byAsin, built above), floored
+      // at 0 per ASIN so a heavily-returned item can't go negative and drag
+      // down the rest of the total. This feeds both the Top Selling
+      // Products table AND the Active SKUs hero stat below (an ASIN with
+      // net units of 0 no longer counts as "active with sales").
+      function netByAsin(gross, returns) {
+        const out = {};
+        Object.keys(gross).forEach(asin => {
+          out[asin] = Math.max(0, gross[asin] - (returns[asin] || 0));
+        });
+        return out;
+      }
+      const amzUnitsByAsin = netByAsin(unitsByAsin(amzMtd.filteredRows, skuToAsinMap), amzReturnsMtd.byAsin);
+      const webUnitsByAsin = netByAsin(unitsByAsin(webMtd.filteredRows, skuToAsinMap), webReturnsMtd.byAsin);
+      const wmtUnitsByAsin = netByAsin(unitsByAsin(wmtMtd.filteredRows, skuToAsinMap), wmtReturnsMtd.byAsin);
+      const amzPrevUnitsByAsin = netByAsin(unitsByAsin(amzPrev.filteredRows, skuToAsinMap), amzReturnsPrev.byAsin);
+      const webPrevUnitsByAsin = netByAsin(unitsByAsin(webPrev.filteredRows, skuToAsinMap), webReturnsPrev.byAsin);
+      const wmtPrevUnitsByAsin = netByAsin(unitsByAsin(wmtPrev.filteredRows, skuToAsinMap), wmtReturnsPrev.byAsin);
+      const allAsins = new Set([...Object.keys(amzUnitsByAsin), ...Object.keys(wmtUnitsByAsin)]);
+
+      // Active SKUs (hero stat) — count of ASINs with net units > 0 across
+      // Amazon + Walmart, MTD. Replaces the old gross-SKU-set count (which
+      // counted any ASIN with an order line at all, even if every unit
+      // sold was later returned).
+      const activeSkuCount = Array.from(allAsins).filter(asin =>
+        (amzUnitsByAsin[asin] || 0) + (wmtUnitsByAsin[asin] || 0) > 0
+      ).length;
+      const heroSkuEl = document.getElementById('sk-hero-skus');
+      if (heroSkuEl && activeSkuCount > 0) heroSkuEl.textContent = String(activeSkuCount);
+
+      // Channels (hero stat) — previously static hardcoded text ("3"),
+      // never actually computed. Now counts channels with net MTD units >
+      // 0, same "netted against returns" basis as Active SKUs above,
+      // rather than assuming a fixed channel count regardless of whether
+      // each channel has any real sales data flowing yet.
+      const channelTotals = [amzUnitsByAsin, wmtUnitsByAsin].map(
+        m => Object.values(m).reduce((s, v) => s + v, 0)
+      );
+      const activeChannelCount = channelTotals.filter(t => t > 0).length;
+      const heroChannelsEl = document.getElementById('sk-hero-channels');
+      if (heroChannelsEl && activeChannelCount > 0) heroChannelsEl.textContent = String(activeChannelCount);
+
+      // Ads vs Organic — Amazon + Website + Walmart (Walmart added
+      // 2026-08-06 per Jaclyn). Amazon's and Walmart's ad sheets are
+      // pre-aggregated by whole month, not by day, so this reflects the
+      // CURRENT month's ad units as tracked so far (same caveat as the
+      // Ad Spend/ACOS estimate above) rather than a precise MTD figure.
+      let adUnitsByAsin = {};
+      let adUnitsByAsinPrev = {};
+      try {
+        // FIXED 2026-08-28 per Jaclyn's "thorough QA" request -- this used
+        // to run a SECOND, separate fetch against gid 158578426 on the ad
+        // orders file. Confirmed live: that gid is the ÉVOLIS brand's tab
+        // (brand="skinuva" on every row) — same brand now, and this block had
+        // no brand filter at all. Since Évolis ASINs never match Skinuva
+        // ASINs, adUnitsByAsin[asin] was silently always 0 for every real
+        // Skinuva ASIN -- meaning "MTD Organic Units" and the Top Products
+        // table's ad/organic split were treating 100% of Amazon units as
+        // organic, with Amazon's ad-attributed units never actually
+        // subtracted (Walmart's separate subtraction, further down, was
+        // unaffected). Fixed by reusing adOrdersCsv -- already fetched
+        // above from the correct SHEET_AD_ORDERS/skinuva(-tab-named,
+        // actually skinuva-scoped) gid for this exact purpose (adDrivenOrders) --
+        // instead of a second, wrongly-pointed fetch.
+        if (adOrdersRowsMerged.length) {
+          const adRows2All = adOrdersRowsMerged.filter(r => (r.brand || '').trim().toLowerCase() === 'skinuva'.toLowerCase());
+          adRows2All.filter(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth)
+            .forEach(r => {
+              const asin = (r.asin || '').trim().toUpperCase();
+              if (!asin) return;
+              adUnitsByAsin[asin] = (adUnitsByAsin[asin] || 0) + (parseInt(String(r.ad_units || '').replace(/^'/, ''), 10) || 0);
+            });
+          // Same month used for the Organic Units MOM comparison below.
+          adRows2All.filter(r => parseInt(r.year, 10) === lastMonthYear && parseInt(r.month, 10) === lastMonthNum)
+            .forEach(r => {
+              const asin = (r.asin || '').trim().toUpperCase();
+              if (!asin) return;
+              adUnitsByAsinPrev[asin] = (adUnitsByAsinPrev[asin] || 0) + (parseInt(String(r.ad_units || '').replace(/^'/, ''), 10) || 0);
+            });
+        }
+      } catch (e) { console.warn('[Skinuva][overview] ad units lookup failed:', e.message); }
+
+      // Walmart per-ASIN ad units — added 2026-08-06 per Jaclyn. Joined
+      // via item_id -> asin (walmartItemIdToAsinMap, built earlier from
+      // column I of the Product Short Name sheet). Walmart's item-level
+      // ad sheet only ever contains rows with real spend (zero-spend rows
+      // filtered server-side by upload-walmart-ads.js), so every row here
+      // is genuine ad activity.
+      let wmtAdUnitsByAsin = {};
+      let wmtAdUnitsByAsinPrev = {};
+      try {
+        const wmtAdOrdersCsv2 = await fetch(sheetCsvUrl(WALMART_AD_ORDERS_SHEET_ID, WALMART_AD_ORDERS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => '');
+        if (isCsv(wmtAdOrdersCsv2)) {
+          const wmtAdRows2All = parseCsv(wmtAdOrdersCsv2);
+          wmtAdRows2All.filter(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth)
+            .forEach(r => {
+              const asin = walmartItemIdToAsinMap[(r.item_id || '').trim()];
+              if (!asin) return; // no Walmart Item ID -> ASIN mapping for this row — skipped, not guessed
+              wmtAdUnitsByAsin[asin] = (wmtAdUnitsByAsin[asin] || 0) + (parseInt(String(r.ad_units || '').replace(/^'/, ''), 10) || 0);
+            });
+          wmtAdRows2All.filter(r => parseInt(r.year, 10) === lastMonthYear && parseInt(r.month, 10) === lastMonthNum)
+            .forEach(r => {
+              const asin = walmartItemIdToAsinMap[(r.item_id || '').trim()];
+              if (!asin) return;
+              wmtAdUnitsByAsinPrev[asin] = (wmtAdUnitsByAsinPrev[asin] || 0) + (parseInt(String(r.ad_units || '').replace(/^'/, ''), 10) || 0);
+            });
+        }
+      } catch (e) { console.warn('[Skinuva][overview] Walmart per-ASIN ad units lookup failed:', e.message); }
+
+      // -- MTD Organic Units (net of returns, net of BOTH Amazon + Website ads) --
+      // Changed 2026-08-05 per Jaclyn: this card used to be "MTD Organic
+      // ORDERS" (a count), which couldn't cleanly subtract returns (those
+      // sheets are line-item/qty level, not a "whole order cancelled"
+      // flag). Switched to UNITS instead, which the returns data nets
+      // against cleanly: Organic Units = total net blended units (mtd.units,
+      // already netted above) minus Amazon ad-attributed units minus
+      // Website ad-attributed units, each capped per ASIN at that channel's
+      // own net units so an ASIN's ad units can never exceed what actually
+      // sold net of returns (same guard used per-row in the Top Selling
+      // Products table below). Website ad units come from the "shopping"
+      // tab (Google PMAX campaigns only — the one Google campaign type with
+      // SKU-level data — so this under-counts Website ad units from any
+      // other Google campaign type; best available source per Jaclyn).
+      const webShopUnitsByAsin = webShoppingUnitsByAsin(webShoppingRows, mtdStartStr, mtdEndStr, skuToAsinMap);
+      const webShopUnitsByAsinPrev = webShoppingUnitsByAsin(webShoppingRows, prevStartStr, prevEndStr, skuToAsinMap);
+      const totalAdUnitsCurr = Array.from(allAsins).reduce((s, asin) =>
+        s + Math.min(adUnitsByAsin[asin] || 0, amzUnitsByAsin[asin] || 0)
+          + Math.min(wmtAdUnitsByAsin[asin] || 0, wmtUnitsByAsin[asin] || 0), 0);
+      const allAsinsPrev = new Set([...Object.keys(amzPrevUnitsByAsin), ...Object.keys(wmtPrevUnitsByAsin)]);
+      const totalAdUnitsPrev = Array.from(allAsinsPrev).reduce((s, asin) =>
+        s + Math.min(adUnitsByAsinPrev[asin] || 0, amzPrevUnitsByAsin[asin] || 0)
+          + Math.min(wmtAdUnitsByAsinPrev[asin] || 0, wmtPrevUnitsByAsin[asin] || 0), 0);
+      const organicUnits = Math.max(0, mtd.units - totalAdUnitsCurr);
+      const organicUnitsPrev = Math.max(0, prev.units - totalAdUnitsPrev);
+      setKpi('sk-kpi-organic-orders', organicUnits.toLocaleString(), pctChange(organicUnits, organicUnitsPrev), ovMomSuffix);
+
+      function momBadge(curr, prevVal) {
+        if (!prevVal) return '';
+        const p = Math.round(((curr - prevVal) / prevVal) * 100);
+        if (p > 0) return `<span class="tp-mom-up">▲ ${p}%</span>`;
+        if (p < 0) return `<span class="tp-mom-dn">▼ ${Math.abs(p)}%</span>`;
+        return `<span class="tp-mom-flat">—</span>`;
+      }
+      function unitCell(curr, prevVal) {
+        if (!curr) return '<span class="tp-dash">—</span>';
+        return `<span class="tp-units">${curr.toLocaleString()}</span>${momBadge(curr, prevVal)}`;
+      }
+
+      const productRows = Array.from(allAsins).map(asin => {
+        const a = amzUnitsByAsin[asin] || 0, m = wmtUnitsByAsin[asin] || 0;
+        const aPrev = amzPrevUnitsByAsin[asin] || 0, mPrev = wmtPrevUnitsByAsin[asin] || 0;
+        const total = a + m, totalPrev = aPrev + mPrev;
+        // Ad units = Amazon Ads (capped at Amazon's own net units) +
+        // Walmart Ads (capped at Walmart's own net units, added
+        // 2026-08-06 per Jaclyn).
+        const adUnits = Math.min(adUnitsByAsin[asin] || 0, a) + Math.min(wmtAdUnitsByAsin[asin] || 0, m);
+        const orgUnits = total - adUnits;
+        return { asin, name: asinNameMap[asin] || asin, amazon: a, amazonPrev: aPrev, walmart: m, walmartPrev: mPrev, total, totalPrev, adUnits, orgUnits };
+      }).sort((x, y) => y.total - x.total).slice(0, 15);
+
+      const tbody = document.getElementById('sk-products-tbody');
+      if (tbody) {
+        if (!productRows.length) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">No sales ${cfg.isPartial ? 'yet this month' : 'this period'}.</td></tr>`;
+        } else {
+          tbody.innerHTML = productRows.map((r, i) => `
+            <tr>
+              <td style="padding:7px 10px;">${i + 1}.</td>
+              <td style="padding:7px 10px;">${r.name}</td>
+              <td style="padding:7px 10px;"><div class="tp-cell">${unitCell(r.amazon, r.amazonPrev)}</div></td>
+              <td style="padding:7px 10px;"><div class="tp-cell">${unitCell(r.walmart, r.walmartPrev)}</div></td>
+              <td style="padding:7px 10px;"><div class="tp-cell">${unitCell(r.total, r.totalPrev)}</div></td>
+              <td style="padding:7px 10px;">${r.adUnits > 0 ? `<span class="tp-units">${r.adUnits.toLocaleString()}</span>` : '<span class="tp-dash">—</span>'}</td>
+              <td style="padding:7px 10px;">${r.orgUnits > 0 ? `<span class="tp-units">${r.orgUnits.toLocaleString()}</span>` : '<span class="tp-dash">—</span>'}</td>
+            </tr>`).join('');
+        }
+      }
+
+      // -- Donut: revenue share by channel (real MTD revenue, net of returns) --
+      // Switched to the net figures 2026-08-03 — using gross here while the
+      // hero KPI above uses net would make the donut's total silently not
+      // match the hero number, which is worse than either being wrong alone.
+      // FIXED 2026-09-14 per Jaclyn -- "Last Month toggle not changing the
+      // Goal Tracker card." Root cause: this chart was the only one on
+      // this page created without a destroy-before-recreate guard. On the
+      // FIRST call (initial page load) the canvas is empty, so `new
+      // Chart(...)` succeeds. On every call after that (any period
+      // toggle, either direction), the chart from the previous call is
+      // still attached to this same canvas -- Chart.js throws "Canvas is
+      // already in use" here, which is an UNCAUGHT exception inside this
+      // function's outer try block. That aborts everything from this
+      // point through the end of initOverviewLive for that call --
+      // Ad Spend/ACOS, Channel Breakdown, Ad Sales/Organic Sales KPIs,
+      // the Goal Tracker, Ad Spend by Type, and the Trend chart below --
+      // while only logging to console.error (no visible error), which is
+      // exactly why the page looked "frozen" on toggle instead of erroring
+      // outright. Same destroy-before-recreate pattern already used
+      // everywhere else in this file (e.g. window._impressChart,
+      // window._ppcAdTypeChart) fixes it here too.
+      if (window._skDonutChart) { window._skDonutChart.destroy(); window._skDonutChart = null; }
+      const donutTotal = amzMtdNetRevenue + wmtMtdNetRevenue;
+      if (donutTotal > 0) {
+        window._skDonutChart = new Chart(document.getElementById('chart-sk-donut'), {
+          type: 'doughnut',
+          data: {
+            labels: ['Amazon', 'Walmart'],
+            datasets: [{ data: [amzMtdNetRevenue, wmtMtdNetRevenue], backgroundColor: ['#001f60', '#6b7ba2'], borderWidth: 0 }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 10, font: { size: 12 } } } } }
+        });
+      }
+
+      // -- Ad Spend / Blended ACOS -- Amazon (prorated monthly estimate) + Website (real MTD) --
+      // Amazon: see file-level comment above this IIFE for why this isn't a
+      // true day-level MTD figure. MOM here compares this month's prorated
+      // estimate against LAST month's actual total prorated by the exact
+      // same day-fraction (days elapsed / days in that month) -- i.e. an
+      // apples-to-apples "estimated MTD vs estimated MTD one month back"
+      // comparison, built from monthly-only ad data instead of day-level
+      // order rows.
+      // Website: added 2026-08-05 per Jaclyn — Google Ads' "ads" tab is
+      // real day-level data, so no proration is needed on this side at
+      // all: webAdsMtd/webAdsPrevMtd (computed above) are already true,
+      // day-aligned MTD and prior-MTD sums. They're added directly to
+      // Amazon's prorated figures for one blended Ad Spend / ACOS number.
+      let proratedSpend = 0, proratedSales = 0, proratedSpendPrev = 0, proratedSalesPrev = 0;
+      if (adOrdersRowsMerged.length) {
+        const adRows = adOrdersRowsMerged;
+        if (cfg.isPartial) {
+          // MTD -- unchanged from the original (only) behavior: estimate
+          // "this month so far" by prorating the LAST FULL month's real
+          // total by the exact day-fraction elapsed, then do the same one
+          // month further back, for a fair MTD-vs-MTD comparison built
+          // from monthly-only ad data.
+          let lm = refMonth, ly = refYear;
+          lm -= 1; if (lm === 0) { lm = 12; ly--; }
+          let lm2 = lm - 1, ly2 = ly;
+          if (lm2 === 0) { lm2 = 12; ly2--; }
+
+          const lastMonthAdRows = adRows.filter(r => parseInt(r.year, 10) === ly && parseInt(r.month, 10) === lm);
+          const twoMonthsAgoAdRows = adRows.filter(r => parseInt(r.year, 10) === ly2 && parseInt(r.month, 10) === lm2);
+
+          const lastMonthSpend = lastMonthAdRows.reduce((s, r) => s + parseAmt(r.spend), 0);
+          const lastMonthSales = lastMonthAdRows.reduce((s, r) => s + parseAmt(r.sales), 0);
+          const twoMonthsAgoSpend = twoMonthsAgoAdRows.reduce((s, r) => s + parseAmt(r.spend), 0);
+          const twoMonthsAgoSales = twoMonthsAgoAdRows.reduce((s, r) => s + parseAmt(r.sales), 0);
+
+          const daysInLastMonth = new Date(ly, lm, 0).getDate();
+          const daysInTwoMonthsAgo = new Date(ly2, lm2, 0).getDate();
+
+          proratedSpend = lastMonthSpend * (daysElapsed / daysInLastMonth);
+          proratedSales = lastMonthSales * (daysElapsed / daysInLastMonth);
+          proratedSpendPrev = twoMonthsAgoSpend * (daysElapsed / daysInTwoMonthsAgo);
+          proratedSalesPrev = twoMonthsAgoSales * (daysElapsed / daysInTwoMonthsAgo);
+        } else {
+          // ADDED 2026-08-28 per Jaclyn -- Last Month: both the reference
+          // month and the one before it are already fully complete, so use
+          // each month's real total directly. No proration applies (or is
+          // needed) once a month is over -- these vars keep the
+          // "prorated*" names below only so every downstream reference
+          // (blendedSpend, ACOS, the Channel Breakdown table, etc.) didn't
+          // need touching.
+          const curAdRows = adRows.filter(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth);
+          const prevAdRows = adRows.filter(r => parseInt(r.year, 10) === lastMonthYear && parseInt(r.month, 10) === lastMonthNum);
+          proratedSpend = curAdRows.reduce((s, r) => s + parseAmt(r.spend), 0);
+          proratedSales = curAdRows.reduce((s, r) => s + parseAmt(r.sales), 0);
+          proratedSpendPrev = prevAdRows.reduce((s, r) => s + parseAmt(r.spend), 0);
+          proratedSalesPrev = prevAdRows.reduce((s, r) => s + parseAmt(r.sales), 0);
+        }
+      } else {
+        console.warn('[Skinuva][overview] ad orders sheet did not return CSV — Ad Spend/ACOS will reflect Website only.');
+      }
+
+      // Walmart — added 2026-08-06 per Jaclyn. Reads SHEET_WALMART_ADVERTISING
+      // directly (skinuva tab), which is ALREADY pre-aggregated at
+      // brand+month, unlike Amazon's ASIN-level Ad Orders sheet which
+      // needs summing across rows. Current month added directly (no
+      // proration) — Walmart's row already represents "the month so far"
+      // as of whenever the weekly Cowork pull last ran (Monday mornings),
+      // not a live daily figure the way Amazon's/Website's are. That
+      // means the blended total below is honestly a mix of live daily
+      // data (Amazon, Website) and a snapshot up to ~6 days stale
+      // (Walmart) — flagging rather than presenting all three as equally
+      // fresh.
+      let walmartSpendThisMonth = 0, walmartSalesThisMonth = 0, walmartSpendLastMonth = 0, walmartSalesLastMonth = 0;
+      try {
+        const walmartAdvCsv = await fetch(sheetCsvUrl(WALMART_ADVERTISING_SHEET_ID, WALMART_ADVERTISING_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => '');
+        if (isCsv(walmartAdvCsv)) {
+          const wmtAdvRows = parseCsv(walmartAdvCsv);
+          const wmtThisMonth = wmtAdvRows.find(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth);
+          const wmtLastMonth = wmtAdvRows.find(r => parseInt(r.year, 10) === lastMonthYear && parseInt(r.month, 10) === lastMonthNum);
+          if (wmtThisMonth) { walmartSpendThisMonth = parseAmt(wmtThisMonth.spend); walmartSalesThisMonth = parseAmt(wmtThisMonth.sales); }
+          if (wmtLastMonth) { walmartSpendLastMonth = parseAmt(wmtLastMonth.spend); walmartSalesLastMonth = parseAmt(wmtLastMonth.sales); }
+          console.log('[Skinuva][overview] Walmart ad spend added — this month:', walmartSpendThisMonth, 'last month:', walmartSpendLastMonth);
+        }
+      } catch (e) { console.warn('[Skinuva][overview] Walmart Advertising Cache lookup failed:', e.message); }
+
+      // ADDED 2026-08-25 per Jaclyn -- Channel Breakdown table, full width,
+      // placed above the Revenue by Channel donut / Monthly Revenue Trend
+      // cards. Amazon + Walmart only. Moved to this point in the function
+      // (rather than right after the KPI cards above) specifically so Ad
+      // Spend/Ad Sales are available -- Amazon's is the same prorated
+      // MTD estimate the Ad Spend/ACOS KPI cards use (proratedSpend/
+      // proratedSales; see the file-level comment on that estimate for
+      // why it's not a true day-level figure), Walmart's is the actual
+      // ad summary row for the current month (walmartSpendThisMonth/
+      // walmartSalesThisMonth, just fetched above).
+      (function renderOvChannelBreakdown() {
+        const tbody = document.getElementById('sk-channel-breakdown-tbody');
+        if (!tbody) return;
+        const rows = [
+          { label: 'Amazon',  adSpend: proratedSpend,          adSales: proratedSales,          units: amzMtdNetUnits, orders: amzMtd.totalOrders, revenue: amzMtdNetRevenue },
+          { label: 'Walmart', adSpend: walmartSpendThisMonth,  adSales: walmartSalesThisMonth,  units: wmtMtdNetUnits, orders: wmtMtd.totalOrders, revenue: wmtMtdNetRevenue },
+        ];
+        tbody.innerHTML = rows.map(r => {
+          const rowAov = r.orders > 0 ? r.revenue / r.orders : 0;
+          const money = v => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return `<tr>
+            <td>${r.label}</td>
+            <td>${money(r.adSpend)}</td>
+            <td>${money(r.adSales)}</td>
+            <td>${r.units.toLocaleString()}</td>
+            <td>${r.orders.toLocaleString()}</td>
+            <td>${money(r.revenue)}</td>
+            <td>${money(rowAov)}</td>
+          </tr>`;
+        }).join('');
+      })();
+
+      const blendedSpend = proratedSpend + walmartSpendThisMonth;
+      const blendedSpendPrev = proratedSpendPrev + walmartSpendLastMonth;
+      const blendedSales = proratedSales + walmartSalesThisMonth;
+      const blendedSalesPrev = proratedSalesPrev + walmartSalesLastMonth;
+      const acos = blendedSales > 0 ? (blendedSpend / blendedSales) * 100 : 0;
+      const acosPrev = blendedSalesPrev > 0 ? (blendedSpendPrev / blendedSalesPrev) * 100 : 0;
+
+      setKpi('sk-kpi-adspend', '$' + blendedSpend.toLocaleString(undefined, { maximumFractionDigits: 0 }), pctChange(blendedSpend, blendedSpendPrev), ovMomSuffix);
+      setKpi('sk-kpi-acos', acos.toFixed(1) + '%', pctChange(Math.round(acos * 10), Math.round(acosPrev * 10)), ovMomSuffix, true);
+
+      // ADDED 2026-08-25 per Jaclyn -- MTD Ad Sales (the same blended
+      // ad-attributed sales figure ACOS above is already built from) and
+      // MTD Organic Sales (Total Sales -- mtd.revenue, computed near the
+      // top of this function -- minus Ad Sales, floored at 0, same
+      // pattern as the existing Organic Units card).
+      const organicSales = Math.max(0, mtd.revenue - blendedSales);
+      const organicSalesPrev = Math.max(0, prev.revenue - blendedSalesPrev);
+      setKpi('sk-kpi-ad-sales', '$' + blendedSales.toLocaleString(undefined, { maximumFractionDigits: 0 }), pctChange(blendedSales, blendedSalesPrev), ovMomSuffix);
+      setKpi('sk-kpi-organic-sales', '$' + organicSales.toLocaleString(undefined, { maximumFractionDigits: 0 }), pctChange(organicSales, organicSalesPrev), ovMomSuffix);
+
+      // ── Goal Tracker (Amazon) ────────────────────────────────────────────
+      // ADDED 2026-09-10 per Jaclyn. Goal side comes from a separate, hand-
+      // maintained Google Sheet (one row per month) -- NOT this function's
+      // usual live order/ad sheets. Actual side reuses this same period's
+      // already-fetched Amazon data (amzRows/amzReturnsMtd/proratedSales
+      // above), but with its OWN pending-inclusive validity rule
+      // (goalsIsValidAmazonRow) instead of isValidAmazonRow, since a goal
+      // should count pending orders as progress -- they haven't been
+      // returned, just not yet settled -- while every other KPI on this
+      // page deliberately excludes them. Wrapped in try/catch, same as the
+      // other optional per-channel fetches above: a bad month lookup or a
+      // sheet hiccup here shouldn't take down the rest of the page.
+      try {
+        const goalsBody = document.getElementById('sk-goal-tracker-body');
+        if (goalsBody) {
+          const GOALS_SHEET_ID = '1trsHDgVSLprsOOjOuFWGZRDqVOV-eII3';
+          const GOALS_GID = '196666138';
+          const goalsCsv = await fetch(sheetCsvUrl(GOALS_SHEET_ID, GOALS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => '');
+          if (isCsv(goalsCsv)) {
+            const goalsRows = parseCsv2D(goalsCsv);
+            const goalsRow = findGoalsRow(goalsRows, cfg.year, cfg.month);
+            if (goalsRow) {
+              const totalGoal   = parseGoalAmt(goalsRow[GOALS_COL_TOTAL]);
+              const organicGoal = parseGoalAmt(goalsRow[GOALS_COL_ORGANIC]);
+              const adsGoal     = parseGoalAmt(goalsRow[GOALS_COL_ADS]);
+
+              // Amazon-only actuals, pending included, netted against
+              // returns the same way amzMtdNetRevenue is above.
+              const goalsAmzAgg = aggregateRange(amzRows, mtdStartStr, mtdEndStr, goalsIsValidAmazonRow);
+              const goalsTotalActual = Math.max(0, goalsAmzAgg.totalRevenue - amzReturnsMtd.totalAmt);
+              // FIXED 2026-09-14 per Jaclyn -- "MTD field is broken." This
+              // used to reuse `proratedSales` directly, but that variable
+              // means two different things depending on the period (see
+              // its own comment above): for Last Full Month it's the real,
+              // final total for that completed month (fine to reuse as-is
+              // -- no proration actually happens in that branch despite
+              // the name); for MTD it's ALREADY a pace-based projection
+              // built from LAST MONTH's total (lastMonthSales * dayFrac),
+              // because Amazon's ad sheets have no day-level breakdown to
+              // read a true "this month so far" figure from directly.
+              // Feeding that pre-projected number into buildGoalGaugeHtml
+              // as `actual` double-projects it -- that function applies
+              // its OWN day-elapsed projection on top (see its `projected
+              // = actual * daysInMonth/cfg.day` below), which had been
+              // inflating both the ring fill and the "Projecting $X" line,
+              // and by extension goalsOrganicActual too (Total - Ads).
+              // Fixed by reading THIS month's own (partial, still-in-
+              // progress) row from the ad orders cache directly under MTD
+              // -- same real-row lookup the Last Full Month branch above
+              // already does for its own reference month -- so
+              // buildGoalGaugeHtml's single day-elapsed projection is the
+              // only projection applied, matching how the goal ring is
+              // supposed to work (actual = genuine so-far progress,
+              // projection computed once, in one place).
+              const goalsAdsActual = cfg.isPartial
+                ? adOrdersRowsMerged
+                    .filter(r => parseInt(r.year, 10) === cfg.year && parseInt(r.month, 10) === cfg.month)
+                    .reduce((s, r) => s + parseAmt(r.sales), 0)
+                : proratedSales;
+              const goalsOrganicActual = Math.max(0, goalsTotalActual - goalsAdsActual);
+
+              const daysInMonth = new Date(cfg.year, cfg.month, 0).getDate();
+              goalsBody.innerHTML =
+                buildGoalGaugeHtml('Total Sales', goalsTotalActual, totalGoal, cfg, daysInMonth) +
+                buildGoalGaugeHtml('Organic Sales', goalsOrganicActual, organicGoal, cfg, daysInMonth) +
+                buildGoalGaugeHtml('Ads Sales', goalsAdsActual, adsGoal, cfg, daysInMonth);
+            } else {
+              goalsBody.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0;grid-column:1/-1;">No goals row found for ${monthNames[cfg.month - 1]} ${cfg.year}.</div>`;
+            }
+          } else {
+            goalsBody.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0;grid-column:1/-1;">Goals sheet unavailable.</div>`;
+          }
+        }
+      } catch (e) {
+        console.warn('[Skinuva][overview] Goal Tracker failed:', e.message);
+        const goalsBody = document.getElementById('sk-goal-tracker-body');
+        if (goalsBody) goalsBody.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0;grid-column:1/-1;">Goal Tracker failed to load.</div>`;
+      }
+
+      // ── Ad Spend by Type (SP/SB/SD) ──────────────────────────────────────
+      // ADDED 2026-09-11 per Jaclyn, ported from évolis. Identical
+      // component to the one on the PPC page — same Advertising Cache
+      // sheet, same sp_/sb_/sd_ columns — but this page re-renders by
+      // re-running the whole IIFE on period toggle (see initOverviewLive's
+      // own idempotent-per-period comment above) rather than PPC's
+      // mtd/lastFull dual-store + separate re-render call, so this just
+      // computes and renders directly for cfg.year/cfg.month, matching how
+      // every other Overview KPI/table here already works. Unique
+      // window._skAdTypeChart var (PPC's copy of this feature uses
+      // window._ppcAdTypeChart), per the porting notes' per-page chart-var
+      // convention.
+      try {
+        const ovAdTypeTbody = document.getElementById('sk-adtype-tbody');
+        const ovAdTypeNote = document.getElementById('sk-adtype-note');
+        if (ovAdTypeTbody) {
+          const adSummaryRows = isCsv(adSummaryCsv) ? parseCsv(adSummaryCsv) : [];
+          const amzAdSummaryRow = adSummaryRows.find(r => parseInt(r.year, 10) === cfg.year && parseInt(r.month, 10) === cfg.month) || {};
+          const numAdType = v => parseFloat(String(v || '').replace(/[$,%]/g, '')) || 0;
+          const adTypeRowsForChart = [
+            { key: 'sp', label: 'Sponsored Products' },
+            { key: 'sb', label: 'Sponsored Brands' },
+            { key: 'sd', label: 'Sponsored Display' },
+          ].map(t => {
+            const spend = numAdType(amzAdSummaryRow[t.key + '_spend']);
+            const sales = numAdType(amzAdSummaryRow[t.key + '_sales']);
+            return {
+              label: t.label,
+              spend, sales,
+              units: numAdType(amzAdSummaryRow[t.key + '_ad_units']),
+              acos: sales > 0 ? (spend / sales) * 100 : null,
+              campaigns: numAdType(amzAdSummaryRow[t.key + '_campaigns_running']),
+            };
+          });
+
+          if (window._skAdTypeChart) { window._skAdTypeChart.destroy(); window._skAdTypeChart = null; }
+          if (window._skAdTypeSalesChart) { window._skAdTypeSalesChart.destroy(); window._skAdTypeSalesChart = null; }
+
+          const moneyAdType = v => `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+          const pctAdType = v => v == null ? '<span class="tp-dash">—</span>' : `${v.toFixed(2)}%`;
+          const totalAdTypeSpend = adTypeRowsForChart.reduce((s, r) => s + r.spend, 0);
+          const totalAdTypeSales = adTypeRowsForChart.reduce((s, r) => s + r.sales, 0);
+
+          // Same two genuinely-separate honest-note messages as the PPC
+          // page's copy of this card — see that render function's comment
+          // for why these stay distinct rather than being collapsed.
+          let adTypeNote = null;
+          if (totalAdTypeSpend <= 0) {
+            adTypeNote = 'No ad spend recorded for this period yet.';
+          } else {
+            const activeAdTypes = adTypeRowsForChart.filter(r => r.spend > 0);
+            if (activeAdTypes.length === 1 && activeAdTypes[0].label === 'Sponsored Products') {
+              adTypeNote = '100% Sponsored Products this period — no active Sponsored Brands or Sponsored Display spend.';
+            } else if (activeAdTypes.length === 1) {
+              adTypeNote = `100% ${activeAdTypes[0].label} this period — no active spend in the other ad types.`;
+            }
+          }
+          if (ovAdTypeNote) {
+            if (adTypeNote) { ovAdTypeNote.style.display = ''; ovAdTypeNote.innerHTML = `ℹ ${adTypeNote}`; }
+            else { ovAdTypeNote.style.display = 'none'; ovAdTypeNote.innerHTML = ''; }
+          }
+
+          ovAdTypeTbody.innerHTML = adTypeRowsForChart.map(r => `
+            <tr>
+              <td>${r.label}</td>
+              <td>${moneyAdType(r.spend)}</td>
+              <td>${moneyAdType(r.sales)}</td>
+              <td>${r.units ? r.units.toLocaleString() : '<span class="tp-dash">—</span>'}</td>
+              <td>${pctAdType(r.acos)}</td>
+              <td>${r.campaigns ? r.campaigns.toLocaleString() : '<span class="tp-dash">—</span>'}</td>
+            </tr>`).join('');
+
+          const ovAdTypeChartOpts = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 10, font: { size: 11 } } } }
+          };
+          const ovAdTypeColors = ['#001f60', '#6b7ba2', '#c9a15a'];
+
+          const ovAdTypeCanvas = document.getElementById('chart-sk-adtype');
+          if (ovAdTypeCanvas && totalAdTypeSpend > 0) {
+            window._skAdTypeChart = new Chart(ovAdTypeCanvas, {
+              type: 'doughnut',
+              data: {
+                labels: adTypeRowsForChart.map(r => r.label),
+                datasets: [{ data: adTypeRowsForChart.map(r => r.spend), backgroundColor: ovAdTypeColors, borderWidth: 0 }]
+              },
+              options: ovAdTypeChartOpts
+            });
+          }
+
+          // Ad Sales circle — added 2026-09-11 per Jaclyn: a single Ad
+          // Spend circle was "only half the story." Same rows, same
+          // colors/legend, just .sales instead of .spend, so the two
+          // circles read as a matched pair rather than two different
+          // visual languages.
+          const ovAdTypeSalesCanvas = document.getElementById('chart-sk-adtype-sales');
+          if (ovAdTypeSalesCanvas && totalAdTypeSales > 0) {
+            window._skAdTypeSalesChart = new Chart(ovAdTypeSalesCanvas, {
+              type: 'doughnut',
+              data: {
+                labels: adTypeRowsForChart.map(r => r.label),
+                datasets: [{ data: adTypeRowsForChart.map(r => r.sales), backgroundColor: ovAdTypeColors, borderWidth: 0 }]
+              },
+              options: ovAdTypeChartOpts
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[Skinuva][overview] Ad Spend by Type failed:', e.message);
+        const ovAdTypeTbody = document.getElementById('sk-adtype-tbody');
+        if (ovAdTypeTbody) ovAdTypeTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Ad Spend by Type failed to load.</td></tr>';
+      }
+
+      // -- Trend: trailing 6 COMPLETED months, blended revenue across channels --
+      // ROOT CAUSE of the blank chart: these revenue-history sheets use
+      // UPPERCASE positional headers (MONTH/YEAR/REVENUE), the same
+      // convention already confirmed working in buildRevenueChart() /
+      // buildWebChart() elsewhere in this file. My generic lowercase-keyed
+      // parseCsv() was looking up row.year/row.month/row.revenue against a
+      // sheet whose real keys are YEAR/MONTH/REVENUE -- every lookup
+      // silently returned undefined -> 0, so "no non-zero months" fired
+      // for the wrong reason. Parsing by column index now, matching the
+      // already-proven pattern exactly.
+      function parseRevenueHistory(csvText) {
+        if (!isCsv(csvText)) return [];
+        const lines = csvText.trim().split('\n');
+        if (lines.length < 2) return [];
+        const headers = parseCsvLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim().toUpperCase());
+        const monthIdx = headers.indexOf('MONTH');
+        const yearIdx = headers.indexOf('YEAR');
+        const revenueIdx = headers.indexOf('REVENUE');
+        if (monthIdx < 0 || yearIdx < 0 || revenueIdx < 0) {
+          console.warn('[Skinuva][overview] revenue sheet missing MONTH/YEAR/REVENUE columns -- found:', headers);
+          return [];
+        }
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCsvLine(lines[i]);
+          const yr = parseInt((cols[yearIdx] || '').replace(/^"|"$/g, ''), 10);
+          const mo = parseInt((cols[monthIdx] || '').replace(/^"|"$/g, ''), 10);
+          const rev = parseAmt((cols[revenueIdx] || '').replace(/^"|"$/g, ''));
+          if (yr && mo >= 1 && mo <= 12) {
+            if (yr < 2015 || yr > 2035) {
+              console.warn('[revenue-history] implausible year', yr, 'for month', mo, '— skipping row (likely corrupted YEAR cell at the source). Revenue was:', rev);
+            } else {
+              rows.push({ year: yr, month: mo, revenue: rev });
+            }
+          }
+        }
+        return rows;
+      }
+
+      const [amzRevCsv, wmtRevCsv] = await Promise.all([
+        fetch(sheetCsvUrl(AMZ_REVENUE_SHEET_ID, AMZ_REVENUE_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(WMT_REVENUE_SHEET_ID, WMT_REVENUE_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+      ]);
+      const amzRevRows = parseRevenueHistory(amzRevCsv);
+      const wmtRevRows = parseRevenueHistory(wmtRevCsv);
+      console.log('[Skinuva][overview] revenue-history row counts -- amazon:', amzRevRows.length, 'walmart:', wmtRevRows.length);
+
+      function monthlyRevenue(rows, y, m) {
+        const row = rows.find(r => r.year === y && r.month === m);
+        return row ? row.revenue : 0;
+      }
+      const trendLabels = [], amzTrend = [], wmtTrend = [];
+      let ty = now.getFullYear(), tm = now.getMonth();
+      for (let i = 0; i < 6; i++) {
+        tm -= 1; if (tm === 0) { tm = 12; ty--; }
+        trendLabels.unshift(`${monthNames[tm - 1]} '${String(ty).slice(2)}`);
+        amzTrend.unshift(monthlyRevenue(amzRevRows, ty, tm));
+        wmtTrend.unshift(monthlyRevenue(wmtRevRows, ty, tm));
+      }
+      // FIXED 2026-09-14 per Jaclyn, same root cause and fix as the donut
+      // chart above (destroy-before-recreate) -- this one just never got
+      // far enough to actually throw yet, since the donut crash aborted
+      // the function before execution ever reached here on any call after
+      // the first.
+      if (window._skTrendChart) { window._skTrendChart.destroy(); window._skTrendChart = null; }
+      if ([...amzTrend, ...wmtTrend].some(v => v > 0)) {
+        window._skTrendChart = new Chart(document.getElementById('chart-sk-trend'), {
+          type: 'line',
+          data: {
+            labels: trendLabels,
+            datasets: [
+              { label: 'Amazon', data: amzTrend, borderColor: '#001f60', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3, tension: 0.3 },
+              { label: 'Walmart', data: wmtTrend, borderColor: '#6b7ba2', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3, tension: 0.3 },
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 24, padding: 12, font: { size: 13 }, generateLabels: bigLegendLabels } } },
+            scales: { y: { ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'K' } } }
+          }
+        });
+      } else {
+        console.warn('[Skinuva][overview] no non-zero months found for trend chart — check revenue-history sheet gids (expects UPPERCASE columns: MONTH, YEAR, REVENUE).');
+      }
+    } catch (err) {
+      console.error('[Skinuva][overview] fetch/parse failed:', err);
+    }
+  };
+
+})();
+</script>
+
+<script>
 // ── Brand data for Option A cards ──
 // ── Évolis Summary tab — ported verbatim from Évolis's own internal
 // Overview page (Goal Tracker, KPI rows, donut/trend/ad-type charts,
@@ -2236,6 +3721,180 @@ function activateEvolisSummary(containerEl) {
   }
 }
 
+// ── Skinuva Summary tab — ported from Skinuva's own internal Overview
+// page (single Amazon Goal Tracker card, Channel Breakdown table,
+// dual Ad Spend/Ad Sales-by-type donuts, Amazon+Walmart-only Top
+// Selling Products — Website is intentionally excluded from blended
+// KPIs here, per Skinuva's real dashboard). Populated live by
+// activateSkinuvaSummary() below.
+const SKINUVA_SUMMARY_HTML = `
+    <div class="sheet-link-menu">
+      <button class="sheet-link-btn" onclick="document.getElementById('sk-sheet-dropdown').classList.toggle('open')">🔗 Source Sheets <span style="font-size:9px;">▾</span></button>
+      <div class="sheet-link-dropdown" id="sk-sheet-dropdown">
+        <a href="https://docs.google.com/spreadsheets/d/1SiYu8e2-Pfi14Aiuf6SAFytWVXb4_dtdNFT6wvLFPok/edit?gid=1163928587#gid=1163928587" target="_blank" rel="noopener"><span class="sheet-link-icon">📦</span>Amazon Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/16mnFaFkTfXS4FzZ2mI5aoDKNrw8FWe8R8IUDnv3FHVs/edit?gid=267551179#gid=267551179" target="_blank" rel="noopener"><span class="sheet-link-icon">↩️</span>Amazon Returns</a>
+        <a href="https://docs.google.com/spreadsheets/d/1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI/edit?gid=158578426#gid=158578426" target="_blank" rel="noopener"><span class="sheet-link-icon">📣</span>Amazon Ad Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/1equxdiqpzonA5TgsrKzbrpq92QHyJP8kQ2RoUiYmank/edit?gid=1237377804#gid=1237377804" target="_blank" rel="noopener"><span class="sheet-link-icon">💰</span>Amazon Revenue</a>
+        <div style="border-top:1px solid var(--border2);margin:6px 4px;"></div>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=597852778#gid=597852778" target="_blank" rel="noopener"><span class="sheet-link-icon">🌐</span>Website Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=1033366681#gid=1033366681" target="_blank" rel="noopener"><span class="sheet-link-icon">↩️</span>Website Returns</a>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=7000599#gid=7000599" target="_blank" rel="noopener"><span class="sheet-link-icon">💰</span>Website Revenue</a>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=219707263#gid=219707263" target="_blank" rel="noopener"><span class="sheet-link-icon">📣</span>Website Google Ads</a>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=1841786277#gid=1841786277" target="_blank" rel="noopener"><span class="sheet-link-icon">🛒</span>Website Shopping/PMAX</a>
+        <div style="border-top:1px solid var(--border2);margin:6px 4px;"></div>
+        <a href="https://docs.google.com/spreadsheets/d/1oIZDxN0vSf4nRvE_K95lsNyBWQd4Ef2aARm0RUtvE0Y/edit?gid=1844526926#gid=1844526926" target="_blank" rel="noopener"><span class="sheet-link-icon">📦</span>Walmart Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/1XxYmX0NT-4bqKh4N96zNAPIAzctXDQaK6Yzp6hVWjJc/edit?gid=344983459#gid=344983459" target="_blank" rel="noopener"><span class="sheet-link-icon">↩️</span>Walmart Returns</a>
+        <a href="https://docs.google.com/spreadsheets/d/1PYUPePnhnBJp77n3HVSKeM824ZorAMkiJC8WFbyORCU/edit?gid=664808652#gid=664808652" target="_blank" rel="noopener"><span class="sheet-link-icon">📣</span>Walmart Ad Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/1H1mAYxu8udO7vuCPGs8u0iVzHaRh0wbHb4PyIka4pUU/edit?gid=844750080#gid=844750080" target="_blank" rel="noopener"><span class="sheet-link-icon">📣</span>Walmart Advertising</a>
+        <a href="https://docs.google.com/spreadsheets/d/1QhKeOxKR0mEfSiM2pdYxrEBWsQdRSxbL8Q86MP6lpFE/edit?gid=812984298#gid=812984298" target="_blank" rel="noopener"><span class="sheet-link-icon">💰</span>Walmart Revenue</a>
+        <div style="border-top:1px solid var(--border2);margin:6px 4px;"></div>
+        <a href="https://docs.google.com/spreadsheets/d/1NNRTRQxQl2r4XivAvH700CC39p49GD2xfZlyRNqahGA/edit?gid=164358627#gid=164358627" target="_blank" rel="noopener"><span class="sheet-link-icon">🏷️</span>Master SKU List</a>
+      </div>
+    </div>
+    <div class="brand-hero">
+      <div class="brand-hero-left">
+        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMTIwMCIgem9vbUFuZFBhbj0ibWFnbmlmeSIgdmlld0JveD0iMCAwIDkwMCAyMjUiIGhlaWdodD0iMzAwIiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0IiB2ZXJzaW9uPSIxLjAiPjxkZWZzPjxmaWx0ZXIgeD0iMCUiIHk9IjAlIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBpZD0iYzBiNzZjZjEyOCI+PGZlQ29sb3JNYXRyaXggdmFsdWVzPSIwIDAgMCAwIDEgMCAwIDAgMCAxIDAgMCAwIDAgMSAwIDAgMCAxIDAiIGNvbG9yLWludGVycG9sYXRpb24tZmlsdGVycz0ic1JHQiIvPjwvZmlsdGVyPjxmaWx0ZXIgeD0iMCUiIHk9IjAlIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBpZD0iMTQxNzI5YjBkNSI+PGZlQ29sb3JNYXRyaXggdmFsdWVzPSIwIDAgMCAwIDEgMCAwIDAgMCAxIDAgMCAwIDAgMSAwLjIxMjYgMC43MTUyIDAuMDcyMiAwIDAiIGNvbG9yLWludGVycG9sYXRpb24tZmlsdGVycz0ic1JHQiIvPjwvZmlsdGVyPjxjbGlwUGF0aCBpZD0iZjA2NDA0NWU5NiI+PHBhdGggZD0iTSAyNCA5IEwgODc1Ljk5NjA5NCA5IEwgODc1Ljk5NjA5NCAyMjUgTCAyNCAyMjUgWiBNIDI0IDkgIiBjbGlwLXJ1bGU9Im5vbnplcm8iLz48L2NsaXBQYXRoPjxtYXNrIGlkPSJkNzY2OTk2MTJiIj48ZyBmaWx0ZXI9InVybCgjYzBiNzZjZjEyOCkiPjxnIGZpbHRlcj0idXJsKCMxNDE3MjliMGQ1KSIgdHJhbnNmb3JtPSJtYXRyaXgoMC40Njk5MzksIDAsIDAsIDAuNDcwMzM5LCAyMy45OTQ2ODcsIDguODk5MzQ2KSI+PGltYWdlIHg9IjAiIHk9IjAiIHdpZHRoPSIxODEzIiB4bGluazpocmVmPSJkYXRhOmltYWdlL3BuZztiYXNlNjQsaVZCT1J3MEtHZ29BQUFBTlNVaEVVZ0FBQnhVQUFBSFlDQUFBQUFDdVJ1a1hBQUFBQW1KTFIwUUEvNGVQekw4QUFDQUFTVVJCVkhpYzdiMDlreHRIc3UrZGU4LzZBNTR2d0piT0J4aHM4UGpzamVDSmVEek9HbnZkYVRxU1NjalNlaXA1V2t1Z3FYWFk5SjdZTlFUWlVvU2EzaldrRU9oZFI5cW05MWdpNWhQMFl3Q1l3VXRYWlhWM1psVjE0Lzl6SktKNktoTkFvLytWOVpKSkJBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUY4dzh0Z01BQURDYy94WGJBVEFWOGxsc0R3QUFBSUJrV0VBV0FRQUFnQjJ6RXJJSUFBQUE3SUFzQWdBQUFQZk1LOGdpQUFBQXNBT3lDQUFBQU54VHJDR0xBQUFBd0E3SUlnQUFBSERQRXJJSUFBQUE3Q25Yc1QwQUFBQUFrbUZkeHZZQUFBQUFTSVVaWkJFQUFBRFlrMjNLMkM0QUFBQUFxVENITEFJQUFBQjdicG95dGdzQUFBQkFLaFNRUlFBQUFHRFBFcklJQUFBQTdDa2hpd0FBQU1DZUNySUlBQUFBN0ppdEd4UGJCd0FBQUNBUlpwdW1pTzBEQUFBQWtBaHp5Q0lBQUFDd0oyOGdpd0FBQU1DT0FySUlBQUFBN0RHUVJRQUFBR0JQQ1ZrRUFJeUpQOFIyQUV5YzZpbTlLR003QVFBWUlVK2VQWHBDejRpSTZNUFBIMzcrN2VmZklqc0VnQUN6TmFKRkFFQlhIbjN5eithTVg3LzZhMnkvQUJqTXJJWXNBZ0E2OGF4RkVuZkMrUG5Ic1owRFlDRHpUYk9aeDNZQ0FEQWFubjF2MDhTbWFacm1HK2dpR0RuekJySUlBUERrWTdjbU5rM1RmUDVJMFQ1MjJ3QjlpdGQwbDY5amV3RUFHQUdmZjNYNHI1OC8vRUJFUkI5Ly9PUlFDWC83OUllUVBnRWd6UUxSSWdEQWc0OS9lb2dJZi9yODJXSFRvNzkrOCt0QnVCakxRd0JFS0NHTEFBQ1dKNys3ZDlYODladDdXZnluNWl3cUFPcXNJSXNBQUlaUDdqWHhFOXNsSDkvcjRrK1FSVEJtWm12SUlnREF5YjBvT25mVFBQbEpWeFpUMjIwem0xTk9zem5SL09xazVTMVJYZE42VTljeC9BSkRtYTBmWThzTkFNRE9KOTlzLy92enB6KzdMOXh2eVBuNWZ6N29laFNadkREVm10MlEyelJOczY1TWtjZDJGM1JsdmtHMENBQ3c4dGY5Y1VRK0JOd3ZQNnBFaTBuRWl2TjhQci91K2tmdjF0VTZVdVF4bjluYnFtQmVISkJsL0RXYnpoOVdubHVicXFwclowUTByNjdvYmw3MytNdVVjWHoyM1Q5eXgrMVRscDA3UzR1aXNMV3NGOTE2eWtybWdwdE50dzdIeGNyeCtDRWlvc1ZJWjJTZWZMK1Z1TC8vemVQaWovLzVoSWlJZnZnZlJZOWlNVitzTmw0UllodWJWWkZGOExseXVCVEJIWnI3ZklMZG96Umo3OHowOHJOb21tYk4vYVRIaHVOVHFycjNKdjJSSjRUOWc2cTZkbFV5OTdxUjl6NGRDdWJOTjdXa3RadXFxcXFxS2lYN3RQQm90MXBvM1diVGZ2blVEbWpNYnNyK2lyaG52UXcrSzVlWUttWStIMkxSdlY5eFZaeWtMRUlWUFJGVXhZeTUyVGNUdThlT3FKazMzOXhvV01zbE8yMW50N1hVVytYMnN2aU12M1E4RkN2dTYvV2xEaXlNYWFuaXpHYzF0dWpSc2J3cVV0bE1UaGFoaXA0SXF1SWxCNHVPKzYzM1hXZm5adC9yU3JMWFZuYUxpdC9zLzkyUzllMzdmMzcrNU9BdkhtMlA5UDg2bWZNWnVVQ1VlTWk2Q1Bpc1RVb1YxVVJSUXhVbktJdFFSVThrVlpFTkZqTng5eE5oeGo0M2MwbHpENCs2VExMYkZuWVM5LzM5QzVaY3FJZm5HSGRiYnFZeGh6cGJzTE1BM2RtVXdRTEdsRlRSU3hRNzdtYllvYUdLczNVek1WbUVLbm9pcVlxMFpPNzRVdHI3VkFnYkt1YmhQdEhQbTZacG10OGY0ajVyaHZDZm5wejhVVE9CQ2hvWk4vM1JteW9QOHc0U1VrVXZVU3o3OWEyaGl0T1RSYWlpSjZLcXlJWk1tYlQ3YVJBdFZOVCtSQjl0dzc2RGtzTDJ1aG0vUHptNTZKdVdEb2Z3djRUN1k4bXJmOTlxOWYzMHg3clE2anRSbGg0bld0NFU2bTc0c3ludWlLNnJDY2tpaU1CbXlWeGdRbmdSbnNWcGNwTlR2cXNFcmVWUEQwMExkbnpPSjQrSWlINzRsOCsxang1VThOUHRId3NIaTMrVTdZNGpOMC81aXdidytMVlo2SzhMcDBQcE1jSklTaFNKMW5sMVJkZFZQdWtqWlVDYkphTVB0OHVSSHRwemtySFNKS3BkeGRFL2pPWlBkcnMyK09ucHk3Lzk0K0FmajU3c3RwcysrV1QvOG05Lys0cUk2Qk9mRTQ2SmtydW1Ic1hRbjBkTlpnYlZaeTY2N04yN3lnd3E3UTVjVFdZU0ZUT29ub2pPb1BJTGJMMDZUUjMyQjE5S1dqdlowMlFrK3o1aG0vLzBhQ2IwKzZZNTNIeXp1MjQ3MGZydzhuYm05WGRaYndMT29HYmxqN3FCNG82blA1WlRlZUl5K0VTSzczUW5QdnBRdmlDaTYwc0s2WUU4eXp0Mys5TThpQnRCeWRnZnZKRTBkOUxaUXZHeHVnMEMvOEZjUmZTUC8vN3djRGtSMFlkL0VSRTkrcXZsK242RVUwV3pWbHRQUE9XMlRrOEtGRmo0aUdJeU01VUhPNFRMTjBUMHRJemxDWmdDRys0M2JrSjRFUmJEWGZDbUZyUjJxc0ZYb3VrQmp0aXEyczlNU25DaSt5blZoLzAyMjMvTG51UVBwWXA1L1FXM1RpekkxZGZWOU5OUUYxL3oxNlFqaW5UNGpSUnZpT2kyak9VS21BTGxlM2Y3OUlKRk5sUzhNNUxtem9ZZG9yMGZzUlUxcjYwMlcrVjhPTUN4bGRJeHhvcXo1WStQZ3hpNjUyazE5WEN4ZU0xZms1QW8wdFdSTEw0anlDSVlobUhhdVcycW82UGtMbGpXZ3RabXhla3JqODlla1dJYitubXA0bG5scUIrSWlCNDlPYit5UDBGVU1WKy9ER0htaUt1dnA3MzczMGNVNzRwMFJKSG82akRYZnc1WkJBUGhnc1hySW9nYndjaTViUmwzb3VPQWxrMitSckwvUTU0UUVmMzhtOCtsWituZGZuam9RWW9RcW1oQ0I0cGJudFlUbmtYTmZVUXhzUnEvancvR0tadWJPNElzZ2tGYzJNcWk0UzVZU2c2Q1p5MmY3dU5jME1BaHo0ajJjNk5lbCs2azhPQi9SVThzNnF2aXJQcEMzVVk3Vjc4VWtTeXJNL2ZZd1ptYUtCNGYzcTl6eUNJWXh1cXR1MTF2eGk4RzhVTkZ0WEhHVnRLOFFzWFBQeUU2RWRDZmljWVdLODdYUVk1anRQTzZqR2RiazNuRmIxMUtUeFNKcnN1SC8xOFhSSkJGTUFURHRVOXBFY1d3RjRpdWx4UnRMeXJ0WU5xcUloY3JmdnpzMmVlL2ZrVkVKeXVRSDRoYUpsYUhvSzJLTjFXVTJkTTl0MnpkNmpIaUk0cHBGdVIrWGo3OC8rb0ZFV1FSREtEaWdzVUpiYm03NGFLTDk2S2hZdEgrM05iNVFMZVNkcmFQaG9pZUhXUVIrUFg3NzcvYTZ1ZUhJMVg4Z1VnNFZsVE8rT2F6SitTVWQ1djFack1tcXV1SDEzS2krU3pMNXAxUGR6eWZZR3F4ekVjVVg1VHFmdlRoOW1BTVdzNWZucndDUUNmTWorNzJoZWhTVzFSWXpUT2k1aXk5UGM5cVVUTmIvR0xGQi83dU5kbmFIMTFWN0NpSzc5WjFkYWlGRDFSRUZSRVI1ZGw4M21sS2Rub1pOMmVyOFlvaTBXMVYzdi8vWW5aNzhnb0FYYWpldWg4R1Z3c1R4aEYxTExIYkErL0xJT1pNSVdtbUgzLy9lMndQaHNEV0FqdGd2Ynp4bnV6TVRaZUVxdklaTjZQbVFkV3JNbnlLYkI3VVZ0L1djdDdHQW5sUVBSSE9nN3FGTFQ4OGxSVVV0aUp0RWNoY0ptcG55N1pNNHNtTHRrcFN2NStlMkcvOTYwRm9yaXN1dlRlZmZ2ZmkwWHl4OG83cEtwUC80Yyt2bU5OSzkweXJiTkdzOHFnZDlhcFU5Nk0vcnc4U1IrWHZpSWhlRjVGY0FXT25mdU51dnpKQjNGQ0hEUlhmbFpMbWNydTV5RXUxUC8vdHY3d08rdzlDY1FhMThEeTYvN2IwMThNSHFtb3hMMjY4dHZKTWFSTFZTeFRmcEwzSm9IellIYnZKNnlzaWVzMm43UUNnRGNOa1FYc3BtdThsRmpOMlZWSDJKMi9zVGJvRnBVN1pWNUxhYmozOTI4OC90MjNKR1JFRkYvSnZaemlXMlJBak55c3ZLOEwxR1NMT29PcldqanBHYVFhMWFUWUg2UlhtMitMaWhaRFA0Y0VNcWljcU02ajhMNktVOFQ0dTdGcFVKV291ZDVreW9xYUlhRjlINnVRZy9sRWxxVythdzM4ZEl6K0Rxc1lOOXowMlRkUFV4ZURKeld5NThUQlVDcnlqQitLcFlraFIxRlBGbzlXZTNTK3drUEk2TkZCRlQ1UlVrVnRaVkZrSUM4eU1mY2Jsb3ZhYzJ6WVVsbXEzNXk5TzZsNGNxZUsyak9McEpWdSthUnJoQ290YTY0cnprci9tL1l1c0hCeU4xNHZzUzZiU0doSGRGa1B0SklGWFFjVkMzWTNCWEIwczlWWXZpQWhyaTZBbjlaZk1CUk5JRXQ2YVorYVF0NVdrdWN5NXNWZXRvSlFyYWR1SDdiYlRiOXJhUGlicWNxd2pIak4yeTFURDFrZnJZRzNKV21za2M2TEdpaFY5SWtYQkhiZDZzZUt4bXpzN2haVGZZVUdzNklsU3JNZ0hVcm1JK3hIaFEwWFpqTS9NYzZZV05VWkV1OXYrOCtQWGptSkZldlJyMHpSTjg0bnRqMXYxc2k5S3NlS0szUWJ6S3BNYncyMFdIekZKTG9nbWtPUm1YRldHM1J6bWZqUGJmWVNJRmtFZk50eUR4SVR3UWhQRGhZcHZSUE5ZY1dVY0ZkTEwva2JFVkE3ZUJZdWZuMmQyZS9MUVE5cXdpOE5yOFhJV045eDRTbkRIVFp4WTBXZjdrdWpaVE0xWThYajVjL2VCNnRYNlZnU3hvaWRhc2VMa2cwVjI1VlI0NlpTZGtxcEZ6UkVSL2JOcG10Tm41M0dzU1BSVDB6Um5BU1h0TjlzNEpiVXJLckZpemgxVS9Hd3VucVJ6bFgzbnZ1QjUyc2NWV0x3S0tvNGtVaVE2VG9CNjg0NklpTW9KbC80Q2FrdzlXRFRjQlc5cVNYTmNxS2hSVUdxN0tuaDZQUCtZdnhGUlc3QzRqUlYvT0gwNU5iaEZSZmxBY1V2aEhqTnVNaWxETVdKRm4waHhJL3ZCNnNhS1J3dUp1K0crOEJzSUFtSkZUOVJpUlQ3eFN6SGMrM2lFRGhVOU1wSlZvZ2FKNk9PbWFVN1hCazlqeFYyeW05TUZ4RWROMHpUTlAwWGQwWWdWalh0UjhZMVdpYU55bXluRnhsV3BZellJWTZ3eXpIR3drTGpKNzRpSXJxb1J5aUtJamhuWW5qU0d1K0JWTFdtdXJkcndLZUlGcFg3N21Zam9FM2M1cUUrSmlPaVRrNjJxMi8wM3NsdFFGVlF4ZCtlMCtheFFtK1ZiNTg3OFQwL0hPNGM2emlyREhBZXl1TTZKQ0xJSWVsRXkyUi9IWEg0NDV5WTA3NHlvUGZZVUNKR2wrT0lRdGxuYzJuYVlQckRMYy9QVjhhdmJ2L21IdEVQU3VMTlhGN3JHblN2RlV1ZFBnOCtnem4weUZlVFNWclZuVUk5blRJdnpsMFlCWmxBOVVaeEJaZGNYNnNFV29zRVdRakNpNXZoVElFM1R5S2RHMkU2aC9uNFlMSjdOb05MSExVZjV0Mmx4WkNkUUZXTEZoU3RSNTkyZlMzR0RSeFF2SEkxWEl6M1E2MVZsK0VXbDdvYzRoNkZoK2RuWlN3RDR3UWFMbzUwbXlybTZlWGV5RDdVYnZ4SzJSdFRvUGc1OHhBU0x1OU1aQnk4OTJ2NGo5VkRST2RZSUVRZzRoNDJaaUluQXNXTG1NM3dyNU8zcXg0ckhXNkIyY2Y3SW9rWEVpcDVveG9ydXpKM05pQ3RLQlE0VitZcFZPekpaczd1a2I3OGZMQnFleDRyN3ZHOEhlMVczeHpMYTg2UDJSenhXZEU1TEZ3Rld2bll4aDZWUjM3NDQ0NjR5ekhCMWtGMmgySjZ0UWJRSU9sTXhhVHl1Umhvc3NxSGllOWxRa2ExWWRYK2hxRm1pSDM0Z0lucmtUbEh6WVhzNjQyRmw4Y24yZjFPdlF1d01GWXN3UHJqV0ZuTUpBMEZqUmE4cXcwYmNMSVdKRlk4U0QremY2cWlpUmNTS25xakdpbE1ORnRrZmZ5RnJ6emRVbFA4OHR5dUxCNmYwVzJKRm9sK1BMbnEwUGRrdkhTcUt4NHF1VVBITFV0aVloY0l4YmpSaFhKRERyNkNpVWZkRGpldUg3YldiZkxzOGREV3BPdEVnQk5NTUZndnV4LysrbExYbkd5cktmNTYvN2VKQTkxSCs3ZW1NL1ZIK2I1NGN2Smd1cmxCUnVNaWh5d3ZIaUNjWDZEOWdyT2dWS1piQ1JuZUVpUldQM045dnRoWE5YS2NMWWtWUGRHTkZObGdjWlVVcE5uUXJaTzJ4cTVnUHlKK3Yyd1ordnovWi9iTTFWdHdkNWQ4R2k5dWlpeTFKNEJMRDhZaW9BejdvNW5ZM1NvSHVBNnBpMElLS0o0UlN4Y1BQYlAvTmpVY1dvWXFlS0t2aUZNc1Bzd210YWxsNzdNamlrRUxXTnRHVDdWNmFlMW5rMkltaStQeXBPTXBCbWpjTHV4L1o4TjdEcWFLUEtLckY0REZVOGY1Qk1CcFpoQ3A2b3EyS0V5dy96SWFLd3ZuME80U0tHbWRBdDJjUGZXVnhKNHEvdXhQaTlFSjJYZkhHUGkzOVpTVnFpV0ZwWDJVWTAvckNWS29NZDZEY0hUaTl4dG9pNkVUdFRHeEZJOXhUd0tUT0pIb3JPeUptTjd3ZUlaOHc2Qi9iWTRlUHZuY2ZXOXhlOU0zMm9nLy84MEhhRFdsVzlvRkY0R2VjL1l5ZndIeDRxRmd4Y0pYaFU2TEVpZy92ZWlUUkltSkZUN1JqUlQ1WXpHWHNoSUpQTTVQTEd2UjUzaHlnY014dUYvODFYM0VYUHZscGQ2VjdjMDVQUkdQRjdMbTFTUy81YVR1MTlSalBWUkhRalVGTXFjcHdCNHJkbUIvUkl1akUxSUpGTmlQcDIwclVIbDlDNnBqclhOUThFZEdudXlRMW4vL2tua1g5L1B0ZCs2Zi9FdmRCR3Z0cVhyajlwL2RZNStTSCt4SW1WdlNwSGFVYWdrZUtGUi8yM1k0aVdrU3M2SWw2ckRpeDhzT3BoNG9LQmFYb0lWcHN2dm5ZZXMyemZhRDR1OGRVYTNUc3B3aXk4TTdZUldYd3N6YUlLa1lvcUhoQ0xGVWNseXhDRlQzUlYwVzJOS0NZb1JDd2RRNkZRdzIranVNWnVhd0hSRVQwMVgzdkZsMzg2L2Y3Qzd4M3E4YkUvckdXTWR5eGFsZWgxbk1qcDRyeFJUR2VLajdVQ0JtQkxFSVZQUW1naWxNS0Z2bnN4NW1zd2M2aG90SnovWlBmNy92LzZmTlRZWHoyMWE4UHJmWm9NaUhzRC9Jc2hqdld3emVEeDFnQlZOSG41SkIyWXJSNHF2Z2dpK1hRTjZFT1ZOR1RBS3JJeGxlMW1DVjFXSkVxWmUxNWxwQTZKcFAxWWN2OVRwcW1hWnBmLy9uNVg1ODllL2JveWJObm4zeisvYUZ0ZGtkT0dsaDNvRVpZVlNSeVRPZ09EVUQwVmRHbm9LSjZ0dENJcXZnd3dpb0h2Z2wxb0lxZWhGQkY5dEZlaUpsU2hwL1B6R1FOc2hPMmJaU3lQdXo1bkxmODB6TyttOTVJN2tITmJRMmxvSkVPV0xlaENwOTlsY2Vyb09JaVFBR1NhT3lQTGRKdEdkTU5NQzQyM0dsa0U4SUxDUXgzd1p0YTFONnMxem51MjB6VWlUMS8veSttWU9LSFQvLzdCeFhMV3dSVmNXNTdrcitQRkN1V2Q1YUdQS1FYUGZDck1seXEreEdUY3IvTkhySUkvR0hMRHhkQjNCZ01lMHJpenNnYVpJK0J0RlBJZXJIbnQwOWR1dWh1RlVCUUZYTmJReVJSdE1lb2VVQWZlcEJCRk9uaDJDSmtFWFRBTU8zTDlQZHZFWGxNcnkxcldZTTlVMzR0dEQ3TzN6Nzl6L2F6aUIvKzhULy85US9sZkRZaFZMR1VzOUVObStISFNkZnZtM1NWNFE0VTczYi9BMWtFM25EQjRqZ3FTckc1MSs1a2l3MVQwUzlVMVB3NFAvempmLy9uLy83N0Q0Y0MrTnUvL3ZiZi8vbXA1dHpwbGovS2RXV1RtdmZSMXIvVzd5MkpCT2NKTDhuNUZWUXMxZjJJVDc3L0pHNjFKbXJBOURDdjNlMkw1UWl5UVJudUF1azN3UnEwc2VqOWx4NTgrTmUvaUdpL3IrYkR6NHFtamhDTUZXMnBiQ3M1RTEyeHpkM21JWjNvaHA4b0Z1cCtKTURtWnI4d2pHZ1IrRkpPb1B4dytGRFJ1OXJ3S1FFU2FQNndJNWdvQ3FwaWJtdUl0cXhvTjUzdURDcEU4WUE2aHl5Q3JoaW1mWkVGY0dJWWhyMGdsVkJ4Ukx0Nk95Q25pdFpsMTRpemxaVmxGNnFIOGtSaUNWRThZRjNzLys5V2VIQU1Ka3ZGQllzbWlCc0R1T0ZDeGZmQ3Y0YThkNmc0bmwyOVhaQlRSZXV5WWkxbW9qdVY1ZlU4b0E5ZDhDcW9PSUlwSUNsVysyT0w5TEtJNkFZWUU0WnBWenBrSndlcmVVYlk0S0QrSnZnNDBvOFZhekVMUGJERnFZbE9vWHFKNHZScVJ6a29YKzMvNzNVUjBRMHdJcmhnTWZWSlAzYVI3MzBwYTVCYnhuUnY2MVVvS0JVYi9WaXhFclBRQTV2eExLQVAva0FVejFuY0Y4MkRMQUkvQ3FZOThXRFJETDVBMXVBYnBwMXBIaUdpVllkYnFkVXRPQmhWckZoQUZGdTRQN1lJV1FSK3NPV0h5eEJlOUlVTkZkK1ZzZ2JuVEtob3JFbkN0anpONVh4Smc0bXI0c1lTL0dkQnZmQ2pZQTVhRVJIZDNWeWFLQkxsa0VYUURjTzBwL3djbjdHcml0SUxlVXgvYjJwdW9iTVFjeVVSNUZTUjJ6Y1ZoN3I5NVFGN3JyVHdFc1c4VnZjak9SNk9MVUlXZ1Jkc3NHaENlTkVQTmlIcDIwcldJSmR5ZFVtMGRBZUxpYzlJZDBjL1ZxelVMYml3VGFGbUlaM3d3VThVRTg3Sm84ZkRzVVhJSXZEQ01PM3BCb3Q4N1FvamJKSHA3KzJhYU1NRWkwd1hvME5mRmVOaW0zRE1RanJod1J5aWFHZjlVUG9Mc2dnOHFMOWtMa2oyK0d0eW9hSWhZait1cVFXTFUxZkZLcllEZnN3cmo0dUtDeFZGb3VyKzJDSmtFZmpBelBuUmRSSEVqYzd3b2FMMHFtTGhidDZLOElhWmttWTZHUnRUVjBVYmFXMUM5U3VvR0RGMVhtektoN0gvNnp5ZUcyQXNjSE4rcVU3NkdlNUI4RVo0YU16SnNEbjZqdzIxZ2xKeHVGUlZUT3BiUkpWaEZ2TXdXRjJsTmFJQlNjSUZpMmttS3N0ZWNsY1lZWXZNak8zN2F2dGZadi9TR0ZLdWQyRHFxbGpGZHNDREdVU1JwN2hQV0hKVlFSWUJCeDhzSmpVdzNtRzRDOTdVc2dZOVEwVStXQnp1U2tMSXFhSXRMVkFtWm1HaWVJbmlsNlc2SDRsemMzOXNFYklJZUpaTStlSEhDVDdJdVowdjhxRWlVMjM0SWJkYy9aM3p3Z0FGcFFJaXA0cTE1ZlZNek1JMDhhc2RaZFQ5U0ozTncva015Q0pnMlJqbWdnVFh3Z3gzd2F0YTJLSnZxTWh1UXpYdTVuR2hQNE9hM3IyWEZDaW82QXRrRVhTaFpJTEY5TmJDY2k1VXZEUENGcG5zY29kcHlKbWM2Mm11MC9aRVh4WFRmSDRsbzlVUVJXOE9qaTFDRmdHTFlkcVRDeFlOZDhGU090OGpZN0hzY0cxeVk0d0IvRkdzcDlxUzhpMFRzOUNMUDdlL25FbzYwZEpERk44VzZtNk1nK3JGZmE2RHErcFNVeG9BWDByampvU3VURnBQY3E2Z0U5MUo1eDVnUXNWamU5VTc1N1BxT3ErR081UUlncXBvZVQzeW9MNkthNTdCcTNiVURYL05oVkRPdnQ3L0wyUVJjQlEvdXR0Zkx1c2dmbmhpdUF2RVEwVm1WSEJpYituT3YyWHlnZDZrZy80TXFrY3dkTEdnb0dKSGxnL0hwakNKQ2hqR1ZYNllEUlhmUzRlS3VmdlpmQnFhTWd1MTZlYVc3WXljS2xhMmhsek14TlNBS0hhbWVOZ2dmbFdtdGk0RUVzTXc3VW5sNzJRMXo0UmVWVHkxeDF4ZjlQY2tNZVJVMGZxVjVXSW1Kb1pQbGVFN2lPSXhEMFdJNmJxQ0xBSVhiTENZVUpMd2dwdFVPOXdRS2dJWG5KNTlPRXl3bU5RWVl4QnlxbWhkNWNuRlRFd0x2OXBSRU1Wak52bkRUeE95Q053WXB2MTVIc0FKUDh6Z0M3ckNWeHMrcFhUL2hlbnJTV29Jcml2YUJoSlA4ZWhxQXdVViszRlFoQml5Q054VTdvd3NDVDNJbWUyZ0NxRmk5dHpkYnM1ZnVwVHF3NEtxV05zYXNJZXlCWWhpWDliNXcvOURGb0VUN3V4Rk1sdEVESGVCK0NrU3htSmJ4bFV1dVd6UjA1WFVFRlRGeXRaUXlObVlERDVWaGdtaTJNcjZvZG9pWkJFNFlXbzlKQk1zTWtjcmlkNUsxNUhqY3E2MkNpQVRMQ2FYRjZFbmdxcG9mWVEvemVTTVRBU3ZLc012SUlydGxKODkvRDlrRWJnd1RQdlRKR2F5K0dMRFJ0b2swK0hiMW9mUHhxM042U1hSNjBlSVdIRlN5WUJFUUVIRllSd2NXNFFzQWhkc3NKakVObFNteWlIUjIwclk0b3dKRlUybmwvZE01RWt2cUlxYmQ3YVdBcyt0SXlDS1F5a2dpOENQeFFqS0QwY0lGUm1MTmhYbXFnOFh2WnhKRGNuY05wV3RZU3FCdFJCZUJSVS9LOVg5R0RPTGd5SFlkUlhORFpBOGZQbmhFRjY0WVVQRjd5cGhpOTdWaHIwYnZKcEhRaEJWbk13cXJBaGVvdmdtaVltZGRObmtoN0pZUnZNREpBK3pReVNCOHNNWjY0RzRpNHdPdjY5c0xVejE0UlFpNytHRVVjVXJQT1B2UVVGRkVUYkZ3Y1B1dG96bUIwZ2RQbGlNUFdZMzNEQzU3WlRFTVBxR2l1dzZiUFFoaGdTU3FyaXhEeU51YzBFN293YWlLTVE2aHl3Q0g3aGdNZllDRDNkR1FtRmVzbUJDeGRMZXhtVFJ1ODY3ZTVNY29qVXpITnQya2NsNUIwUlJpdlhod3d5eUNHeHNESE5CNUFVZXcxMGdIeW95SnAzTlEvNTJKTWlxb24xUTlyaVVORFJlZktvTXY1dkVMSVErNWNGcGZzZ2lzTEowWjdXT0hDeXlvZUtka1RiSlZSc3VYYTJWOWF3QkVTV1VMV2dBb3Fyb091UDVIRXVMaE5wUnNwU0gyOFFoaThDR1lkcS95QUk0WVlOOU1NclhSamFNd1VITlJSZFAwa1MyNnJEcjgzcFppSm9hSlJCRldRcklJdkNBS1lFVWRkb3ZaNUowbnhYL0hjNE5FeW95QnFkZlVFcFdGZGV1bGRqWGhhaXRFUUpSbE9idzJDSmtFZGd3VEh2RUo3bmhMbGlLUHhDWUNXUFdvQm5VUEFKa1ZkRWRYRis2TEhwVkdTNGdpaDA0T3JZSVdRUVdTcTc4c0FuaFJSdGM2VitGVUpFeHlSdWNmTEFvcklvcjUwcnM2MUxXMnJoQTdTZ0ZEcXN0RXQyYVdINkF0REZNKyswOGhCY3RHUFlDOFdFeVkzTEZHNXo2eXFLd0tqTEIrZTNxY2c5b1FCUlZxQStQTGRJWFJTdy9RTkl3cCt5aUpRbS80VUxGOTZGRFJaK3d1Wng0UVNscFZXVHV2dWRWckRGWmJDQ0tTcXlMdzM5ZCtpdzlzR0NZOWtnSENsak5NK0ltQzNlenorRklKbDFRN0xRSWc1RldSZTR6djY2WUN5YUtWNVhoQlVTeEI2dkRZNHVRUmRBS0d5eWFFRjZjd2h3Y2RHZVo2UWQzUE5MNGRNSlZIL1oxSmxIRVZiRis1VzYvZW4ySnM2aCtWWVpMWlM4bVNubDB5MEVXUVJ2Y2t6cEtzR2dHWHlCdDBpK1B6cVowTm8rOW9KUzRLcExoemdZOXI1TW9meDBTRkZSVVpYRlU5QTJ5Q0ZwWWMrV0h5eEJlSE1PR2l1OUthWk5jcU9ocGtKbjVOWDY5cElxOEttNEs3b3FyYjFlWnVObVVnU2dxVXh4dGZZWXNnaFlNMHg2K0NOTE1jRmZJVDBYMnJEWjhDbE45ZU9RRnBlUlZrU3BtRHBXSW5xK2pWMjhKaUZkQnhWZWx1aDhUSm9jc0FnYm1RUjRod0Zsd29hS3ZSdmt6Szl6dHhyY2o1c0p4cnl3cXFDSVpkL3BZSXFLckwrcHhmMjRkOEtzeWZERWZod3JIeHhZaGk2QUZ3N1NIRG5CbTdHL2VpTnRrcWczN3l6QXp4aGgzUVNrTlZUd3FDR3ZqNnV1NlVMQ2RIaWlvR0lMalk0dVFSWEFPdHhHUWxtRW5zQmlGVWdrVnVXUnYvbDJWN21iajMxTjZhS2ppY2VVN0s0OWZieTVnSGhXaUdJYjE4UmF1MTVkNkxoYllNVW1WSCtaRFJZVlZSYWJhc0tQbzBTbk1VWmRSRjVSU1VjWGpFajkycnI3NFVFNzk2ZVVqaXU4S2RUZW1UL1hpK0o5VHY3RkFaNWpENTRHVHNoZ3VWSHdqZjN5NWNEZWJMbjB4RnpPbWtrWkhGYW5nenN6dXVmMWxYVXc1WVBTcU1weXJ1M0VKbEY4ZS91c0tzZ2hPWVE2ZkJ3MFdzNWZjRlViY0puTVNwRnZLQUNaWUhIT09jQ1ZWcEJ0K3g4Mk82OWNmeXNrZVlFVHRxSUNZb3hrS3lDSTRKYVZnMFhBWCtKMm5sN1RKTko5U2l2YVdFbHFxZUZ6aWgrSDIyODAwaFJHaUdKVGpHUXJJSWpobHlhUVl1UXFXSkp3N1RSOGhWTHdydTNYSEZaUWE3eHlnbGlwMmswVzZtcVF3K29qaUhVUlJqdU1aQ3NnaU9HRmptQXVDemZzWjdvSlh0YmhOdVEyb1c4d2djd21qcG9vZFpaSG82dmJiWmxWa09zNUV3YXZLTUVSUmtNM3grUXpJSWppQmlXK0N6ZnZOdVdmRG5SRzNtYnYzT0hRdmI4eDhtT010S0tXbmlwMWxrWWlldi81M3Zid1o3WWQ1REdwSGhRZXlDTndZcGoxUXNNZ3EwRkordEd6RUxVNjFvSlNpS3ZhUlJhTEhMNy85c0Y3ZVpPTGVoQWFpR0lPVFk0dVFSWEFNR3l5V0liemdLdi8yQ055RzJ1eGprYWsrWEhUdk1RMDBWWkUyYzc5emk2ZGN2L3oyMy9WcWtjdDZFeFlmVWFRYmlLSTBKOGNXcjZvc2poOGdVWktvS0dXNEM4S0hpcXNlRnBrOXZTUFBFYTdIb2hsQ2xlWjBhdVZ3ZVhmSjNPZnRGVEhmQkkreGUyNjY5OFovWmtLYzNISnI1VHZJOFNsVjNYc1QvY2pUd3Y1QlZVSDljUDE2QTNtVE15NDB0ZnhObXpFbTF3RHdOQUFBSUFCSlJFRlVzejZkempidXR5SDdGb0toR2lzUzBmSlAzSXlGaTZjdnYvMVFsNHZ4ellLaHluQThsc2NURk5kVmlnTXJFQTNEdEFjSUZ0bkpTaE04Vk94M09wS3BQb3hnMGNac3hRMk1lRGFWeVdPL2p3UFlXSEh1SGtKdEtlSytDWjZSeG9wRUozZWNiclNJV05HVFZHSkZObGhVWDlZb0dBYzBZaXlWVUpIdHRwSjhDK0hRamhXSk5qZC84U2loNGVicTZSYy9OdVBaZytOVlpmakxVdDJQUytXNENER2lSWENFWWRxdmk4Z09hQndQWWJyc20waUhLU2cxNmh6aHlraUVpN3RCVkZra01KM0t4SXJNWlB1V012YWI0Qmx0ckVpeit0aUFaclNJV05HVFpHTEYwN21FTTJwZDh6RkN4UmxqTXUvYjhTU0RSZjFZa1lnMk4zOFpzcnA0d09QYjE3OXNFdCtkNmxkbHVGRDM0NEk1S1VLTWFCRWN3bTFEVlY0T005d0ZDdWY4bUM3N1YzTGtnc1VFZ3BqdUJGRkZvdFg4eThIVHFIdXVubi85WTVQV1F1TWhLS2lZQU92OCtOK1FSZkFBOHlSWFRuQ3pjR2NqSlhyYm9jcWhKMXd0UjlPLzY5TGRQTXFUL0lGVWtUYW01OWxGQzArLytIR3pTbkZ6cXBjb2ZsZW8rM0hockkrUExVSVd3UUdHYVgvTVhUQ0FHZHUzZ25HbTJuRC9VSEdhQmFWQ3FTSlJYWHowbldpSFY4Ky8vcVV1VTZ2T3VFS1Y0U1FvUHp2K04yUVIzTU1HaTRvcFBCbUJHaVpSRnJoUWNWQWlIVE9vT1VuQ3FTSlJmZk5uMFhpUmlCN2Z2djZ3VGlwazVGSTVFV3BIaGVIazJDSmR5ODlMZ2JGaW9wVWY1Z1JLUlVadTNFcjhmdEJQZ3dzV1J6Z2FEYW1LUkZYeGtiUXVFbDEvL1V1OUhGRVZLb2hpR0lxVHFZbW5aUlEzUUlMVTBjb1BzNkhpZDVXOFVUT29tWVA1TEVlNHNoaFdGWW5xNHRHWFF2dFJEM2o4OHR0Tm1XUnl1SFBlUXhRRGNYSnNrVzdMS0c2QUJGbHl3YUxSc1p1eEdxRWdJa3kxNGZmbHNPNVhreXNvRlZvVmlUWW0rNHZzQWlNUkVWM2RmdnRobGRvaVl3dDNOeERGUUp6VmJJRXNnaDFNWG11aWw1bUtYY09GaW4yUDB6dU5EbW9lMnY4SUMwcUZWMFVpV3QxODlGbVBJbE1zejE5L1dDVStsWXJhVVFIWkZDY1JBV1FSN09DQ1JaMWRJaGxiaUZ6QkxCTXEzcFZERFREVnVZcWgvUWNuaWlvUzFjdjVuMTdKejZRU1BmOTJVNmEwK2VZRWlHSlExamxrRWJTeU1jd0ZLa2NLT0tNcW9XTGhiaGFvNUdpY3JlUExFUjVKRllsb3ZjaFVJc2FyMjEvcVZLZXlJWXFCV1ovTzNrQVd3WllsTnlpWHIvdkxoNHAzUnQ2b1FyWGhVMWJ1d05zTXR4Q1dlS3BJUlBWeS90Rm5DbXVNajcrdXkweSsyK0VzSUlxQktVOU84ME1Xd1E3RHREL1B4VTJ5QXJTc3hXMXk3MU9pdmpHcUQ0c3p1eWw5MG1sM1JYRWlsU3RGWTZOUTgwaUY4V1lIUDZROHV6RmsrNWZORGw1Yk96T3lib2NubmV6Z08reWZ0WkpiYkxIaGpjSWNGMk5VeGlSVEVLR1NzQkdRcUxIaWxzMnFtUDNwUy9HNTFOdGZxc1FXR0ZGbE9BYkY2UW5acEtQRk9yWURGNFJoMnNYTElIRUdSZUsyVXdwMzgwckVKQk1zanEyZ1ZBS3FTRVMwTnZOSGYza2p2UDNtNlM5SnphTkNGT093T0IxdzNZNXZxemhRb09SRzRrYldIclBBSjdQRWR3cTNsR2xrekpSQnJJUWlFVlVrb3MycXlENTZJYXVNdC84MnlleTdlVlBHOXVCQ09UdTJTRjhYTWZ5NGRKTDVKZDdEalk2ZXloN3pNdXdGQ3FFaVkxUnF6K3NrQzBvbHhMd291UW4vTG13S2VSZjdyQ3VXOG01b000MTFSU0thbjYxNkZIS2R5NjRyMm0rdDBhZHh0YisxS2oyWHR0U1N4bTRZWXlyRmpwbWl3RTBXeUZBcFpTY0k2Y1NLZTlabGtYMzA0cFhVT3VQVjZ5b1Q2bW9JS0tnWWtiTmppL1M2aU9ISElOSUx0Y1NJbHUzSk1PMmlteWZaNlZFamFNeXpUN25qa1V5d09LNkNVdW1wSWhGUlhTN21qLzc4cFRzWnV5OVB6dzZ0aFFlaUdKVjFjZnBLcXJKWXgzWWdCdEhPS3pIbEhrU0Zpc2t3TXp3ZGFSc3paZzVZMENRaitrYk9rajVwcWlJUjBhWXkrUi8rL05sM1hHWW1ucXV2WTRlTDcrTHI4bVd6T2oyMm1Lb3MxdGFXMGNlS1dXd0hXakJNKzJPNUh5NW5Ta1UzRktzTm43S2VYa0dwbEpGWWFOeUlycHQzWFZkY2ovT09tTXk2SWhIUjhzeHFJZE94N0xxaW96Y1pkK01oZWpkSmNYYWE5UVN4RTRRRlk2alJDSmlaWTRSTkxtbU1PUmhwSkcwQklxS3NLTmZjYmVWR2N0TnpSMVVjcVNoT1N4VmJubitGU0w5UVJVL3M3NnlJNXhTM0cwWHFZVDVqQi9hNWpLRWpISGRUMDRqdmNuSS9GalV5RkFDYTNTeUhLS09nTm5WVHhiR0s0c1JVa2M1dm5rS2lXMWxWZEd4VXpDUzhqWWNqbE1nanVoVW9XR1QwU1drZkxpUEZ3dldGbUUyMlJ0YWFKdW11SzU2eFdTM21qLzdTZTNQcTlUck9tUmtVVkV5RXMyT0w5RHE5c21PT2V5VUw1c1FsWVpoMm1lcUFNN1lYem84K2NOV0doUS83TU5XSEMxbHJtb3hJRlltR0tlUGpLQm5nN3ZJNmdsVnd6dWJtYk9OV3lrWEh6aGpybE1NT3gwZGRCM09peGZZcjVvSkZKbUNGMmZVaXUrL2xIak9vV2RvZWNvUnJNeXY2WkJTWDJuUFRZUVoxTTZibjdna1RtMEZ0TzgwdjhQWEl6cUNtdVNkRmdsUlhUTGtkS1JJSDBGa2JLcFBJekFhZld0NmllOFpXd2FBU0k0c1Y5MnpLWXRhOWJQSFZ0NkduekZCUU1TWE9qeTFlcFpaQjNrRVcyNEZoMkQvbzRXZXZoc0FrdGhZNWdHNjRVUEZOTmRoR2k5VkJ6ZklXRVN5R1liN3NlR1pESm5Uemp4Vkh1OU9HYUlLeFl0dndlZkFkSVJ3cjJqZVU5ZWt0SVJKTStMWkZQMWhrTjdxcTdLVGlTa2dwbUp4S1FhbVJ4b283MW92c1Q2KzZERFZEeHdiWDlYaGlrVXVnL1BMMGxkU2lSZnZES2kwL084TVZqSWdHSHl3T0hqaHhGOGdsWHZPM3FsQ2ZZMm9GcFVaTjBlV2toTVJPNjA3Mnh2c3dtMkNzMkxZVGYrQTNKQndyT2s0S0RISXpOalBSbTBuV05TNVlySWIxbjJhb3FES0xOWkZnY2R5eDRwWXkvOGcvWUx5cXdrNXFwaGFMWERyRldXS3F0TDZoMnQ2VWgvSkJnNVErNHhNMmJFV3BmRkQvaHJ2Z1ZUMm8vMTVXTlFvYzg4Rml3bmZCSVZOUVJhSjZrWDNtdS9YbVdtUHF3TUZWbGQ2cHVFdm01dXhZVDFLeTZOaWRsUVZ6UW9IYzNsU0Y4c0ZHeVQwN3pKRGU1MHpkWDdvYjFMM05xbnZHV3FQQU1SR2JibndrK2FDbm9ZcEVtMlgyd2xNWGJ3dFZUODY0K2phd1FlQmljMVpXS2lsWmRBemgwM0d5QjVtOUtYNldDOE8wRHdvV1dmMVJDZHNZL1ZrcGZlaVRLaWcxRFFxL0hhbWJiS0NkemxXSEM0RTNGNTVKcml0UzI3SEZJYXNzd3V1S2pzK3BWM2VwNEVqV0dOczFZbE9qRFRscXg2enZLYTN3QmFzMjNORndxV1ZYbEtuRWlrUkVWR1pmK3F3dlhnVXZhNTVvMmFJTFpYMCtwUjE2dGRtQi9RNU9kaGVuRDlmV0ZxbjY0a1BnWnZZR0hMVXozQVVxb1NKalZXWFRLeEh4d1dJeXY3TkxZc1psKzIyYVp2Q3V0ODZ4NGxqR1NNZE1OVlpzemZyUisyU3BkS3pvdUxsR1BJWHFpSmlDajFIYjRIN1NkZCtPTHl4VVpFMGJQY3R5VENwV0pLSk44V2VQNVVXUjNJYWR1QzFEV3dSMnpvOHQwblVxMGFKanU4MklWZEhoZWhMWm53elQzanRZWkZjVkZ4cWhZdUZ1MWdzVmlXcDM5ZUZGSWo4ekozK003WUE0MWR5ODVLNjVLdk1Bbmh4eE82YWM4WlBIWkdjYkE2K3JQUDYyRDNJZnpTaERPU0ZPYm05S1FoV3J0OHo4dE9tM1A2V3d6eHh2ZVYvMjZaYUJLOUZSNXdwRzkxVE9UL0pxWVJSdEF6czVuems4SDlKL2p4blVwbWxXWXhnbEhUTGRHVlFpV3AyNzBXOFNWWG9HMVRIbFZ2ZnBMdzBjdjhnc3RtOUU1REhUYVhwMXkrNy9LMFRmeFE2Mm1tTkVhbzAzTE16VVpsQ0ppS2pLMkJYOE1vQWJKenhQWlk0T0VGRnhmb3VrTVlsYTJac2VaNkdja0NaenBNZXVnM25ob25KUC9QV2MrbU1xSEVZS0ZhTXloaHpoazFSRjJzemRPNkhpZkRkcFBIVUJFUkZ0OHZQMTV6UytJTWVJTGcvbWhEQzV2WWxUbzFBVVRIdXY4c09HdTBCRnZ3cXVSRWRVVEd3SGVLYXBpa1RGK1g2S1kwd0lMMDVJNDZrTGlLaTFDSEVhWDVCam5TMFA1b1F3anZST1NTd3JFbnVrb0Zld3VPQkN4YmNxRzNCVERoVkhFU3hPVlJYSnZIQzNSL2x1VUVJaklkYjUrV3NweU9JVVZURzNOMVdoZk9Bd1RQdFY1eVJwTTY1TG5iRTVPMjBibVNLMkF5eVRWVVVxR1ZrMFFidzRJYVhjWWhmUHV1VU91UzZEdTNGS1pXOTZQTks3Wis2WTBrc2xWdVNEeGM3cHloYmNUT2JicW1PUFhoaU5UZ1ZKdjZEVWRGV1JrOFhIVVpKMlF4WVRvdnpzL0xYblpYQTNUbkRKUkI3S0NWa0tlOVA3T3BRVExJWkxqR1c2OWNkdmV1bllvUitwaDRycHkvYVVWYkgxb1hkQUVjYUxFNjZxUElwZDBNS3lKVHlJbjIvQnNmK2tDT2FFS0xtOUtabFFrYWhteXc5bm5mcUxGQ29XR3AyS2tueEJxU21yWXV0RDc0SG5XU0EzanJuNnNZaGlGN1JRZkhmK1duUlpyT3hOMS9HWFBYdVFPWTZ5VjhHODRGbHl3V0xacGJlTURSV0xMdDM1a284Z1hXN2EyNEVtcm9vdEpXWVBVWmxDNVJZbkNMbkNVNkxsMkdKMFdhd2NiYU9zMWVseXVncmxoQWRNemR5T0syS0dDeFYxOHE0WmpVNkZRVUdwcU14Y1dXNTZUOTY0Y3R1UVQzcnlRdkF0NmpIcDNEWjdabTBsanNvT0hVam50aUhuUjVWRUt1MnVPS3BJSlpGazd4N240NkxqTjhvbDZGWks2c1BtNkVtQ1V1T3R5ekh0V0pFMnJtSHFkYVpoc3ZDSkZwVXFZWVBPYklxV2FiUEkwYUpqaHVQNUNLZFF4ektCS2hzc0d1NENuVkF4OWNuSkxZa1hsSnE0S2xMbE9zMmZxNWowa2NXWHBZcHAwSjExbnB3c3VnTENJcFFUY3JoR3BvbkZ2b1lydUdOOGV6cFBQMy9DblhkWFhjaWVhL1FxVDlyaVBYVlZwS1hqUGxkYXBDbmNlMStKS1BaakZ4eXdidnVGUnYxK0trZGJFY2dIUVZ4UHdDcVVFNTRZcHYxcDRka1JPeHUwckQxNzZvVFI2RlNCVVJTVW1qQTM5dG50dm9zYXpuVkZvdGFxdHVkVDY4bmZGeGV4cmtoayticDhKN2tWMWhXZGxSYXl2cDNHWXU1NE13bWR5OWpCRmJtby9icUpVMnpZWXpFekZZekcyNWRpOHJFaXJleXJORmRhNTJhNHZEcEVSTGNKSkJjRFJFUlV0czE1dnl4Q3UvRkE1V2hMZSs2cGhUR0ZpbUxsaDdsdWFLbXl6NGcxbXd4RmJBY3VITWV3cmVqWEl4c3Ira1dML2VyNWhlTmlZa1ZxM3poY2VQMnBScXpvbU45SWJOY21qM05mWjRMSHVSMGJacHVtOFF3V0k0V0s3QjdhaENnMFBnQWhwaDhyVW1WZldjelZqSlovNGs0RXA1R0tHaEFSMGFLdGZGTzhjNld1UFNoWFJTZ3ZaTGh4SE51N1MyOEdsWTNGSHh1UFR0aHJkRUpGTnB0T1FwallEamk0QUZWMGZQNlpudEhXclkwblhLOFRIQ3RmSkpzOExWbHNTYmx6VHhIS0NSbU1veTJ4SGFoRUpGTisrSWJMTC9QZStMclRoYVNyRForU2NrR3BTMUJGKzI5UE16bVNqeXcrUnE3d1JHZzl0aGhQRmwxeWtYd1d5U055VjY3cUZGV1JyeWpGYXcrN1U0dXowWTh4aFlwSmorNHVRUlUzOXBGM3BtaDIzVkx0L1JTVTBFaUY5a0ZNTEZsMHlzV1lJZ0tuczNkSnF1THdZSkd0V3ZHKzlIZW5BNk82TVZJdUtIVUpxdWg0eG1TYVp0Znp0bW01WTFCQ0l4VmFqeTNHa2tYSFFHNWNXU1NkcDhxVEZFV1BZSkc3Z0d0WENoV0xVWVdLS2E4c1hvUXFWdFlXM1VpdGZiWHFHSlRRU0lYMjR6U1JaSEVxd2FKeE5aWmhmT2hLeFNXbmVwazVtOWxROFYzWndSdC9qRXF2ZXFTN0ZIQVJxbGhieFVsNUU2aVBMS0tFUmlxVXI5cGVqZlAxbEs1RjZXSTBlNWVkZWMvZVY2SGM2SWdaZE1HTS9YT2RVVTM2MVlaUFNYWjBkeEdxYUM5dHFqMWEyZVRjSWdWQkZwTmgwUm9rdk00RHUwRkV6T0dNWkI4bnB4aFhZNklUcUVRMUZ5dzY1N0FYbkRycEZCc2VYYWlZOEZMQUh3WDZ5TnRmM3FSekdHbHRHN0txRDdvM2VjbWxDU1o2UFIvTlkyN2FGUE8yOGc2clBNS2Q3THh0RmpySDNjUnhwOGhPdDNDTTRYNnpwckEyOGNjalREZG5QTGtaWGFqby9CaWpJcUdLUDFwZS80TkEzekxFMU9lQ2VGbDhPU3YwSFFFOGVkVWlpMWRWQkZtczNqdWVjbGNMRTh5UklSaFg0OXM2akJNOXFOOHd2OW5ic3JJMXNjY2psRUpGUm94MTZsYXhmT0ZzdlYyTVkzVFhCMXRPbjloK0hXRE5POVNyTjQrTWI0ZjQxQ0V1QjcwOUhTNG80OXM5V1d2T3JJMWpwbDBqNHhzUjBjSjV2MlJEdWc2Rk8xZDFFZHM5Qi8zTEQvTkoxM0lWajVrY2N6b1o1bmlZWjUrSjQxVUliRzg1aSszWUE5YXZwVmR2SFZYUjllQzhweHp5OW5TNFJGV2tlVmRaMUZMRjJkaHVsM05Xcm5lUWRwVEEvbVR6dm45WTZqanNlaVkxOGVTSEtlSVJTNndEMFBYR2lZRDFucEh0emRiaE9IT0ZYNlFxV2pKejIyVlJTeFdaWVhheXU5b2ZjSWN2NmE0cUV2VVBGdmxTVHBtS3Y2NXlYVTFNOVVsVXJkMW83a0ZON2pFZkRaL0tVc2dWbmdhcjF1OHFRaEtpMHRtYXRxZ1FFYmVySk8wM3NPSGNlOXBlc3R4d0hTdXQ3ekdyaXZGMlp4bDNjeEhDaHlpTVlCeGdIWGYzNnExenJEak9hUEV5WTBXaVphdVR0bWhSTFZaa2FocTFQNVVUd24zTEozc3NZd2NiTE5adGZ4VXJWT1RzNmxqMWdna1dpM2llMlpHSUZXMEhqak9Cdm9Xb2JRMTVJQWZLUC90VWxockJ0TmdGMEg1c01YeTA2QTVYbG9tTm9VNlpNZTRIY3FNdkc3YWlWTkh5b3VHNmZWWDM4SVdIc1J0cEF5b1JzYTR4emVQRk5ocW9ZanYyZ0hWQW4vZnByVWVzYU52R2NZeHJyMk40TGpWV3RIM0I3ZCtPWHF4SXRmTm1NUU43VjZZOTR0NlR6bGxtSys1UHZ6VllaRmIzMU5iM0VnNFYyV0F4eFRrUHpYVkZ6VHBONDhPbnNoUkthS1RCVFd1aXZxdFY0UERNSFU5OWtmUzlrcjkwTnFjZUtoSWZ4VHcranliWmQ2VzB2cGZtV2NVZHpJY3kxUVFtMXNGQUZ0dXpleEtJRmNjWExWNXVyR2hiVldwYitWV01GWm0xcmFUakxmZWlhQjNiUFIrNFlQRXM4R1BPREtxRml0d2FhS1ppMVJ2bWM4empldGVHUkt3WUxjdm95UENxTFBWTG9lOEk0TmkwQi9hQjl3a3pHeUd2RXg1bW03YlVlUWZOWWJ3WWhtSGF6OUxSY24rZ0ZpcTYwK25FVGlKa0JqV1BGZXRvMmNUMjdCNnJpNzE2NnhrckVzM2NJK2d0UlMrZkZMamdXTkU2N2orUEZoVmpSUzRJU0dsaTRSaG1nYTJPN1o4ZnpJcllhZWlYYXFpWXExanRBQk1zWnJIOU8wTWlWclFPZ0hLQnppY0ZLa3VOaHFyOWlHbllhSkVKRnEvS01HNTBabGE2MjAwSUo0WmptUGFUWUpHN25KU3lmakxWaHBYeXJuYkFER29lS2RZeFVqcEpuYXdiNG5yMTFqdFc5SXdXVFMrdnhMbm9XTkg2OWsralJjMVlrUTBEekdBTEtyajNuNDRsVlBRSUZyT0RpOWtqeWJXU2wrbXYyNDB1V0JUQVBsMlN6QXhQNUl4dmg0d25WL2lGcTZMdG16cVJSVlZWWk5OcTVzTk55Tk9lTk8rQklyYUR2ckJ6b3VYQnhkem1ISzIzemFoeENudXkzSm51RTNuY1NXTjl1OGxzQjBoSUZjY2ppNWV1aXJiditWZ1dIYi80YXJnTFhMQ1lZbnJsOXJvakQ5U3hIZlNIQ3hZUHdweFVROFZDeVd3WHVQWHhCRy9pNFZpL2wyVFNPdG0rbFg0RHFXR3FPQnBadkhoVnRFMTNIOHVpL2V1c0JIeGdodGtwcGNyWXd5MFNGTEVkOUlmTjRGYmVYOHFHaWtySDFSazFybldzZG9TWjhqQ3gvZFBBcmhLeFBkdGo4Ni9xMWR0QVZlU1dYWnFtU1NJcDZzV3JJczBzajdyandaUlZGaXNKSDdpbnJaRXdJZ2wzZDFleEhld0NPNExkTHhKeG94ZTF0ODJNUVFvbHM5MjR4R0RSL3ZoTUpKMlBkZVd6WHpBN1ZCVkhraXNjcW1oTnZGQWVYV1Y3ZEZZU0xuQ0xkS244eHZhdzkzWWUyOE11c01GaXRiMHVWckZoYnVtejFySGFHU1pZVEdhcFRSRDdENkdNN2RvVzY1UEY5T3B1c0NxT1F4YWhpdmJ4VkhsMGxVVVdLeEVYMkkyUXlleHBJL0pJNEZURzlyQWJiTENZRTVGSHNlRkt5VC9tN2toRmJwaFJReDNiUHdYc20xQVRPWnNobkdkZ3VDcjZ5V0xreHgxVWtleGZWSGwwVmZ1enN4THhnRTA1SFgzNGRJQnR6dm1lbzhNTUk4QXZXRXcxVkV4bmFwSVpYUlN4L1ZQQS9tN1RtTjZ4eWxndTIxM2ovNFF2MGsrS0NsVWtzaThZbFVkWHRmN29LeGtQMkdWb0lUc0M4TWR4VFd3WHU4SkdnYm5QUlpXU2QweW9hSlRNZG9jWlhkU3gvVlBBL3QyVXNWMGpJdnNXMUo0SEtpVlVjUVM1d3FHS1JHUWY1WmJzVlpXTUEzd2dVcko5QklLZGI2eGplOWdaOXROZiszeERtWTV6ak5ha0V5cXl0MFlhNFpNb2p1ZG5DdCtMZlE2cVgzOGlxcGkrTEVJVnQ2d3NicGRIVjdYODZpc2hCOWdOTjZuRUJQeVpvenkyaTkxaDQ4Q0NmOStsa20rTVlhTmt0ZytNZ0ZleC9aUEg4Yk5OWWJuWHVtdTZaOTRIR1ZYMGs4V2luNHNTUUJXM1dLY0Z5NlBMenA5UWxaUUg3R0h5Tk5abCtNWHlNcmFMUFdBRHdacGRlNHdVS3FhVlNvMVI4RHkyZitMTUhMZE1iTi9JUHRqdit5TVZVa1dhcDExQ0E2cTR3N3FGcER5NjdPeG5YMGs1d0dXTGlYcWIzTU9MWWtvemV2Nnd3U0o3Z0w5VThvd1JHaTJ6L1dCMmpWV3gvWlBIb1JQeEo0enRtdDB6a0pWU3hjUXJTMEVWOTFpait2TG9zdE9IVkNYbUFIdEdQQUZaOU5oV0hmOVowQXRXOVJpMDl0MDZncEdtYVJJTEZka1pqeXkyZitMb0pvTWNpUDNubXZmclVFd1YvV1F4MWlRMFZQRWVxeXlhbzh0T3ZzMUt6Z0YrRGpWMktuNFBVVXdtQVdSSGZJNVJ1VEJLZmpGQmJLbGt0aS9NS1pJeXRuL2l1S0xqUExaejFnblV2bzlqT1ZYMGs4V3lwNThEZ1NvK1lIMHdGb2RYblh5YmxaeDlqem5VdUJ1V1BaUmpuUE9uUkVPRFJhMzN6UzE0WmpwbSszTnh3YUxqdnFraXUyYWZaK2pybWFBcTBpemRYT0ZReFFQNnlHSWxhTjlqRGpYbUpLcFBPRFhTK1ZNYUdpd2FKYStZVUxGU010dWZpd3NXWFNlTmk3aXUyWjhucG1lUGtxcVljQWtOcU9JaDFxK3BPTHpxU0JZclNmdjJHUStMS3lIeGtZMHlsbk1DREFrV1k0V0t1WTdaSWJpRHhmSE9KZGh3VGFIV2NWMnozOUY5cDV4a1ZkRkxGcXNJZHd4VThZanVzbGhKbXVkUGlwKzZFZzRmVWF6SC9NeGpvaHduUnNrbjVrT3ZsTXdPZ1hIWnhQWlBITmRveXNSMHpINldzbmVTVm1GVjlKTEZDTWt1b1lwSDJKZUFDOHRsbGFoOXJ5ZXpFVFhwaWMvOUczc3owRUE4ZGp0WnFMVmNZdUxYWE12dUVOdytUeTlZZEsxN1JNMElySkNOVGxvVnZSYU53c3NpVlBHWXpySll5ZHBuejgwMVRaUjVTaTlSVENHYnh3RDZCNHVGa2tkTTNOVXpRWWt5ak5NanYwbk9jWjZkcWVMNTViaWRlNi8raTZ1aVh3bU5ySysvUFlFcW5tQlBSbFFjWG5Zdmk1V3dmYStBSmZUb3lXc1g5V2dQWmR6VE4xaXN0UnhpUXNWQ3krNHczRjdYc2QwVHh6bGlqRGNJc0g4Ti9hdGN5YXVpbHl5RzNub1BWVHlsb3l4V3d1YTlsaGFiT3VodE12ZmFpRExxUlVVaTZoOHNGa3IrTUxseGF5V3pRMkdlYzBWcy82UngzamJSNWxBZGM1Tmw3MDRWVkRGRldZUXFubUgvbG9yRHkzYXlXRW1iWjBzdGJtK1RndTFJREorQ2FMR1BVc3Jnc3dmNEhMV0pUQ1oyTGJUc0R1WFNna1huOXhScG10czF1czU3OTZxaGlnbVcwSUFxbm1PWHhhT3ZaaXVMVlVEelJ5ekZEYmZqZGRpMlNmZ1ozUUUrQlhnYnVaSTNUT2hhSzVrZERyTTRQdDR6clJiY1gxU29IK294amdGZTNiOVhGVlZNcjRRR1ZMRUY2OEhjemJrc1Z2TG1QV1ZvSFdUNDVKWGR2b24xMjVmRzg2TS9vdEp5aGdrVjA5MjJ3cXdDVkxIOUU4Y2RIQmNSUEhKTnZnL3dSMGNWdldReDVNY0lWV3pEK25BOGw4Vkt3Ynpucm85TmdPZml3bXYyZEFJN2JiYjBDUlp6SlYrWVVESGxJdzVNc0pqSDlrOGFaZ0U0L05xQ0szbmtrQnRIU1JYOWRpNFVReXgwQXFyWWlqVkFPcFBGU3NHNjM1YlBwbW1xVE1INkFabnZyc3dJSjIxMTZCNHNWcEZjTVZwMkJiaTRZSkZKNkJOY0ZsMFBFRE9nWHkxVlRLeUVCbFN4RmZ1WGRDcUxsWVo1cnhtRnB0RU9GMzBEeGJpSGxVWHgyd0o4U0s3a0NSTzJwaHdxc3NGaUZ0cy9hWmk0UHZTZzBUbWdHdUtMbWlxbVZVSURxdGlPZlFyaVJCYU5pbmx2V1d3cXRYSG8zUHY0M2hTMm4rN3hTcU53UUtubHlJaERSYllxWkJuYlAzR1kzMHBZV1hRbWpCbTBBVUJQRlpPU1JhaWlCYnN1QmRHQURoVWNsaXEvdUptckZzQUpVOXBVMkRWWXpKVDg0Rlk0dGV3S3dXaDZGdHMvYWJpdks2UXNPcDhkdytZWUZGV1JaajZqOEhLb0ZTK2dpalljdVhVVGs4V05rVGR2T29oRElXOCtJdDJDeFZMTERVWlcxT3dLd2FoRUdkcy9jYmpiSmx6V012ZVR3d3pxVzFNVi9SYjFWeUdHRjFCRksvYTdLNGdzK3VUTjNWTVhzcmFMTGxXVmhHM0hwbHV3bUVYeVFzdXVHTzRuWE5xcm9uMlljVCtaVU1zTWJsRWNtSUJLVnhXVEthRUJWYlJqbjBNTXNydWswM1pJU1Yzc3BJa1RPYWg0UUpmaGlOcWJaMEtQVXN1dUdFeXdhR0w3Snc2YkxqRE1PWFJtam1uZ1lvZXlLcVlpaTFCRkIvYnZLTWd5UWJkVEF2VkN4S2Zab3BNbWp1RDUzQm4vRDBBdDVCbDlxSGg1d2FKakVMMG53QUNTZVdaVUE3dlhWa1d2OVF2OWh5OVUwWVg5SmtoUUZwdE5tUTIxbUpVZE41dVV3OTlsY3ZndjZSb3RGNWlIUTZWbFZ4QW1uMis2bVhuNndzNmg2cDh2NWphc0RKN2pVbGZGTkhLRlF4VmRPSFlMcHlpTFRiTXVCcmcxSzN5ekI5eFRpcjNWbFBBTkZ2VUNIc2FEWE11dUpPNG5kQjNiUFhrODh2cHZWTGRyNTl5UWR2QlFSRjhWazVCRnFLSVR4MHhXbXJMWU5LdWJmbzdkOUxCVnlyN2JWUEFORmswa0J5b3R1Nkl3QzIxRmJQL2s4Vm1SWG1WcTV0a3AzT0ZwR1FPb1lncXlDRlYwNHpoT242b3NOczJxeUxwWnlZcGVOWlJLalhlY0FuNzVDeEFxdXJtNFlOR3JFcG5HT1NvaW9weWQ0UkFvZ0JwQ0ZmbVF0OUVPdXFHS0RJNFJiN3F5MkRUMThpYnpNNURkTEx2dHI3bG5jcnRQNzJIM0V6Wk5veGp0TUtQbFNCWDdPc044aWxQSy9iRERMNEZ4cmZET013OUJGb2l2Z3FoaS9CSWFVRVVPeHlNcWlDeDJUVUgyUUwweWJtbWMzNWhWVDBWc0pqa0ZkbzlQc0ZpcldXZStrMExOc0RCdWphaGl1NmVBWjZiR0twYzFPL041U0JRQ2hzS29ZblJaaENxeU9ENmlJTExZSWN0TnE0L1YwaFI1bmo5MG1PZDVZWlpWNTYwMXh4UUIzbm8wZklMRklwTHhXc3V1T015ZG04ZjJUd0dQSFRkTjB6Uk5WY2pabkhrbG9pb2xUQVZTeGRpeUNGWGtjVXhpaHBIRnpuVWM5Tm5rQWQ1NFJQaGdzWTVsdTFBekxJNDc2SzFpdTZlQjl4aFc2SHd4Wlg1ckxLV0lzVkNxU0ZuVVhPRlFSUThjOTBJVndyNS9CWTFRVEtsS1JpdjhtRjl0V1d3eW9TSXJFVmxzL3pUb01MVlREcitIQ3IrTllWTEQ5MkNxR0xlRUJsVFJBOWMzVklad3dHdmtGSkRKRkJtMnc0M0FLelhMekhOdVZNZmYzY0ZpR2RzOUZicXNlR3dHQ2VPTmQ4NE5xUjlzT0ZXTUtvdFFSUjljQ2JqS0lBNzBPam1oUlRsOVVXUkxBK1dSREk4clZkb2xCb3NkTndKc1ZvcytFeTh6ZjBrVUhNVUdWRVUvV2RRcG9RRlY5TUkxaDFrRzhhRC9WbFJ4UmhXdDlNWWRMRmFSN0k0dHJiYjd5VjNHZGsrSHp2dmpOaXVUZCtoL2RyUHNOSGtrTjdVVFVoVWo1Z3FIS3ZyaFdtY3FnM2h3azhqaTR0VDMyZXh4eDJ4cTY2cVRDaFc1d2R6WTNvMHZ2YmFOcjFmbUp1ZDY3bk9ZU25CcUo2d3FScE5GcUtJbnJodTlET0pCR291TDFVUWZaT2U0RW1pVmFsYW5GU3B5eFQ5TVBNLytvTm41dkxycStaZDNhNnBvc3lhaTZ2NjFuSWl5ak9hemVaOWUzeFE5WFdtaGVtcHYwL2hBeTF2K21uZjVSdHFzK2NMYTlLWHAzSnREKzFSdndoQXN2cmEzU2Q1NERwWXZnNWh4MGVPbUdDdXoydjRNK3FoV01wcjkyOTJ1WmxnTHh3T0dpTzR5OFNkYUdzeVRHTUkyamZCQm5zQ3hvazk1cnFhcHhTZHVFQ3RpQ1BoQUFBQUg1MGxFUVZSNjR4ckZsMkZjOE1rUXFFbWRoM21mYVdEL2Jlamx1bU9XajBzMXcxb3d3ZUprMTZnVDJSOG52TjRSWEJYajVBcUhLdnJqdXMvTE1DN0UvYTFkd3Q3VEE2d1BkTDNsc0FsVUd6N0ZyZk4xYlBmMDhLbWdvWTMwb2x0NFZZd2lpMUJGZjV4YmhjdEFUc1RiZEtPYnBqNUZiRDhPRTl6aWpsTE5zQjdNOXFFaXRuOTZ6UHZuR0JiQ1NMK2xDS3JvSjR1NXFFbW9ZZ2VjMWJaRHpRWEZDaGVYbHhVb0Vsa2pONFNLblhEdkg2cGp1NmZJckdmQkd5RVUxanRpcUtKZnhzdEMwaUpVc1F2TzFHdEZLQy80U21yeXJQTlE3eTRsMm9lcFJXQjc5MVJxaGpWaGdzVkp6MERFUEU2bE1ZeU5vb3JoYzRWREZUdmhUSTlaQkhQREswbStJRnFWVXBPbmJmeFJoelYzUUs1bldaTlkrUkJTWU9hemlWS0R0Y3FKMmppcUdGd1dvWXJkY0k3bWkyQnVlQ2JLRitMQ2R0a2MwUFoxRjBHdEhWQ3BHZGFGQ1JiejJQN3BNdmZNM3kzS3B0QjVNNUZVMFU4VzVYYUdReFU3a29nc1VoN3N4MVpOdlQ2R2kvUG9yUXBwN0loY3o3SXVseHdzRWxFUmVzVmpZN1NHc2JGVTBlLzhaeWxsRGFyWUZlZFB2QWpvU0I3a29MQjAyZkNSY1Q0SXlnUGFPbUt0WmxnYnBqWldGdHMvZGNLdWVKU1oyaHVKcG9waFMyaEFGVHVUakN3R0dJUmV1Q2JTK1hPZ0NtZnFoRUxQc2pidWQxYkdkaytmV1RCZDNDd3p4ZmNSVHhVOVpWRW1TSVlxZHNiOTlXUkJmZEdkUjRVbW5zYzVldFBKRTZvMmZNckZCNHNVYUI2MVZwczczUkpSRmYxa1VTWnRBVlN4Tzg2dkozUUtxMXh0MzAxNXlldUpEeHcvQ01wUWhzNG85Q3pyYy9IQkloSFJqZlpKNDZyUWZnc3hWZEh2K0tlSUxFSVZlK0RhRVJWKzlTY3pDcU5RN1VIbmVEaU9jN0pBZHM2L0VEWERJWEMvdWFrV2xEcEQ1YWU2djBGVXAwNTNSRlhGY0pXbG9JcDljTWxpRnNFZjZWSG9hdEpIcXp0eStDUW85Y3d3WCtISTAyaTdaNzlNYlBmQ2NWTnFyREJ1eWp5STk1RlYwVXNXQlVwb1FCVjc0ZGd1R09meE5WdUk3VWhkRjVjeWRQZmpJSE9EWWxBenNXckRwN2ozMTQ3OTNYWGpwcFNOR090bEhzcjEyS3JvSll2RGM0VkRGZnRoLzVWSDIwQ2ZTUWpqYXBIRjhqOVpIbjZKSm9TUlZoUXRoOEV0QkNPUGhEc3pOMExiNURaaGY3RFJWZEdyRXNsZ1dZUXE5c1QrRk12aU9UVXJoc3pQMUNXaXhEYnV3emlFaXYxeEI0dDFiUGNpY0ROVUdldlZJdlNHdVBpcUdLU0VCbFN4TDFaWjFDdEo2OFY4c2VxaGpCRitZZU5oLzFVclJqUlREeFc1WUxHSTdWNGM4a1haYTRKbnZUSjVqSUZTQXFyb0pZc0Q3eWVvWW05c3QzTWQyekdpN01aVTN0SzRxY3hORnR2anBNblV2OWhKbHBBNkpyVmc4WS9CTGJaUVZVUTB6K1paTnIveStvUDM5WHF6cnNlYjVraUFrbDd6RjcybVV0MFIwRUplWGJlKy9uZ2UvYWF0NnhYUmJENmY1ZlRVY2RsYnFqYnI5U2FZVzJPbGZ2V1NpTWpvV1ZpNG40bHZhajNUb1NpWHJ2ZjQrR1lWekpNdGZ3aHNqMlUreXpMS01xTHM4ZEhyZDJzaVdtK29yaW42YjdWeVBFN0NmYUR6eW1NSThhTHNieURMckUxMTNibTMzTjVVZGU0c2ViSjErNWZ6S3EyOUEvTVp6V2YwOE9WVVJMUloweWE2ZG8rSFdYMUY5RTV2aW5sV3UzL21IOVZxcHNOaHZuQzF2czBEdVFFQVVNUnliTEdPN1JlUXhqU3FKU3NjNnhoTk01WGNMOHdzY1I3YlB3Q0FBRGZ0UDNEc1c1a2FzNDFxd2FQcHJ5b1NjZHBmeFhZUEFDQkIreGFDTXJaYlFCcWpHY3RNdE5yd0tVeXdtTVgyRHdBZ3diTHQ5eDE3VFJ5SU16T0tuVSsxMnZBcHJUOFdqQ1VCbUJpdEI4MlFSaFQ0Y3lHaElwdXFJSXZ0SHdCQWhMWmppMlZzcDhDSXVKUlFrY3RWRURuOUJRQkFpTFpxaTVoQ0JkNHdKYVNtZElER0hTeUdUV3VYM0hsRkFLWkQyMkd6djRRK2t3eEdpK1BJTUZHdlk4UHBNbmNLWC9SRDZnQUFHVnFPTFpheGZRSUFBQUFpY1Q0SE52NGFCd0FBQUVCUHpuY1JGckZkQWdBNCtJL1lEZ0F3YWRaL3lFOWUrY1AvRzhNUEFBQUFJQVhPOXB4akNoVUFBTURsY2xxUHM0anRFQUFBQUJDTjAyT0xPSm9CQUFEZ2dqbk5mWXdwVkFBQUFCZk15YkhGdEVvUEF3QUFBR0daSDZuaWxESjFBUUFBQUowNVByYVl4WFlIQUdBRDV4VUJDTUQ2N3Y4NStOZjcveFBORVFBQUFDQUJTa3loQWdBQUFIdFdtRUlGQUFBQWRod2VXOFF1VkFBQUFCZk83S0d5ZWgzYkZ3QUFBQ0F5QjhjVzU3RjlBUUFBQUNMemNHeHhHZHNWQUFBQUlEWUZwbEFCQUFDQVBRdE1vUUlBQUFCN1NreWhBZ0FBQUh0S1RLRUNBQUFBTy9iSEZtOWlPd0lBQUFERVp5ZUxaV3cvQUFBQWdBVFlIbHZjeEhZREFBQUFTSUd0TEdJS0ZRQUFBS0Rkc2NVeXRoY0FBQUJBRWhTWVFnVUFBQUQybEpoQ0JRQUFBUGFVVGJPSzdRTUFBQUNRQnJOMTA4eGlPd0VBQUFDa3dXemRGTEY5QUFBQUFCSWgyMkFLRlFBQUFOZ3gzMkFLRllEaytJL1lEZ0J3cWZ4Ly8zZStqdTBEQUFBQWtBcUlGUUVBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUNBcC9uK0llZTVmZXlCWDl3QUFBQUJKUlU1RXJrSmdnZz09IiBoZWlnaHQ9IjQ3MiIgcHJlc2VydmVBc3BlY3RSYXRpbz0ieE1pZFlNaWQgbWVldCIvPjwvZz48L2c+PC9tYXNrPjwvZGVmcz48ZyBjbGlwLXBhdGg9InVybCgjZjA2NDA0NWU5NikiPjxnIG1hc2s9InVybCgjZDc2Njk5NjEyYikiPjxnIHRyYW5zZm9ybT0ibWF0cml4KDAuNDY5OTM5LCAwLCAwLCAwLjQ3MDMzOSwgMjMuOTk0Njg3LCA4Ljg5OTM0NikiPjxpbWFnZSB4PSIwIiB5PSIwIiB3aWR0aD0iMTgxMyIgeGxpbms6aHJlZj0iZGF0YTppbWFnZS9wbmc7YmFzZTY0LGlWQk9SdzBLR2dvQUFBQU5TVWhFVWdBQUJ4VUFBQUhZQ0FJQUFBQUVUeUdjQUFBQUJtSkxSMFFBL3dEL0FQK2d2YWVUQUFBZ0FFbEVRVlI0bk8zZDNaSWlPYkl1VUJpcjkzOWw1b0x1YklxRUlJalFqOHQ5cmF0amR2WjBCZ3FYNVBwS1pGNHVBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBUTEzWDJBd0JBWTdmYjdmNy91RjV0Y3dBQUFKenl2OWtQQUFDOS9BU3BBQUFBY0l6OEZJRE1SS2dBQUFDY0lUOEZJRGtSS2dBQUFJZjV4WEFBSlBRN00vVzdVQUVBQURqQS9WTUFTbkFMRlFBQWdBTmN4Z0VncDVlQnFWdW9BQUFBZk1VeEVvQzBSS2dBQUFDYzVBd0pRR1lpVkFBQUFNNXdnQVFnT1JFcUFBQUFoL243VVFBa0p5b0ZBQURnTUVkS0FFcjRmUXRWcmdvQUFNQkhqbzRBVkNGQ0JRQUE0RnZPalFBVUlrSUZBQURnSzM3L0tRQ2x2ZnpyVWdBQUFIRG4wZzBBdGJ3TVROMUNCUUFBNENYSFJRREtFYUVDQUFDd2s3TWlBQldKVUFFQUFOakRRUkdBb2tTb0FBQUFmT1NVQ0VCZElsUUFBQUMyT1NJQ1VKb0lGUUFBZ0EzT2h3QlVKMElGQUFEZ25mL05mZ0FBaU9obHFBb0FBRUExTHRjQXdOdTAxQzFVQUFDQTRod0xBZUJ5RWFFQ0FBRHdpak1oQVB4RGhBb0FBTUFUQjBJQStJOElGUUFBZ0VkT2d3RHdGeEVxQUFDd2lzTi8rZFlCWno4akJRRFBSS2dBQUVCWWh6UFRseHh6UGpKQUFQQ0NDQlVBQUlpbWJYTDZ4R0huSGVNQ0FDOXM5Q1c2Q2dBQVlMQ3V5ZWtqNTUzZmpBZ0F2Q1pDQlFBQXBodVduRDV5NUhsa0xBRGdMUkVxQUFBdzBaVHc5TTZSNTRlQkFJQXRJbFFBQUdDOGljbnBEMGVlTzZNQUFCK0lVQUVBZ0pFaWhLYy9uSHFxZjM0QTJFT0VDZ0FBakhFNFBOMCttNXpKWkl1ZmVrcC9lQURZVDRRS0FBRDBkaURsUEhBZUdmTlQwcWo3eVpjeitPWjI1VmtCOEk0SUZRQUE2T2VyOE9mOEdlVGJyS25zcWFmb3g0NHYxTys1dUNzN1NRQitiQy9PMWtrQUFPQ3d3ZUhwOUorN2tJcWZPYWFBZ2VtMm1oTm1tSDcxNE1WMU1tVUtoM3FiZFlwV2hFb0VadHhKMFQ0bXE4aGRrQ09ibVNBZkdlNFVQMEhzTDhWT2hiVHpBV3FXOFovWkQxRGFjcG5wbzhlSHJ6bDU0TWZTYzVsdlhhL1hqVGQrdTkwc2lRQUFxOURKdCtLU3dVblR3OVBMcDVQT2o1cEhudi9OZm9CeWJnOW1QMHN6K1Q0UjdLZnlDK3IzUnkwQm9BSjdKVlJqMWpkeHZWNTdCNWM3Ly9zRlg2ajdwK05VS0srZnoxanczeUtvcWNLODVpVzNVQUZJWnVlMUk4akVYMmx1eGVweDBwNEJmS3lmaGdQK3V5emRRbjNKL2RQdWF0N05yUG1wcVdadWhaZmFxMkp5Q3hVQURyTlJNcDBpSE15QXYvTnRlTnI4cC85K0FJZk4zK1NudlFnUTd3d0NXUWxQdVloUUFjaEZnd0g5Sko1Zm10N2VCaFRQNytobXp3OHQ5ZXJscCsxSkRIOHpKaVFqUE9XSENCVUFqckZMTXBIeW04S3cvL1p4VEVhZS9nNUVxSFhJVDF1U0VtNHpQbkNlUFd3NTFqMEFGcUxUZ0I0U3p5eTlibTRmUzdkT0FjaFAyNUFNN21lc1dOM0VBazdjZUMxTlZ3RUF4OWdpbVVMaFRXVHd2ekwrQU9oM29iNGpQejFMR25pTWNXTlJ3bE5lRXFFQ2tJYVdBOXBLUEtlMHVDZHREMkRpeWxtUi9QUTRDZUI1eHBDMUNFL1o0QjBCd0FHT0F3eW01S2J6Q3BialR6NWNMcGMvc3g5Z1ZVWHFZNHpiN1NaM0lEN2hLWGMvbGZEN3ZWeXYxNDA2c2RZQnNJcnRIUTNZTDNIN1o1VTRxY2ZsMDUzL3ErMGY3ZGp5a3Z1blgzTmxzZ2VqU25EcWs5OWVWb1YvbXdXQWI5a2ZHVWF4d2VWUU9DdFJsWjkrUWNiWG0rRWxwcm1WYWFPS1RJUUtRRlk2RURndjhUdzYyZE5xaWJjTnFKeTJQNkxDQzVXZjdsV2hHaUlRVWhPTjhKUnRJbFFBc2hyWmg5Z2NHVUNad1JuRkQ2ZnkwMTJzczRNWmNJSVFucktIQ0JVQWdDZUptL2ttcmF4K21MWElUejl3SFhJV3c4NTB3bFAyTzFBdFZqa0E0bk1GbFRRVUdLRnNGT1NZaGRlTStKYjhkSXQ2bXN2NE01SHdsUE0rdmtlckhBQThzak9TaG41K0QxTitwTnZmTnY0dk42cTNjbUgvbWYwQWNabkpFZHpmUXVVcHloVENVdzY0M1c2LzM5MzFldDB1cDVmL0t3Q0k0K05lQnZHcDRZWU1abVRlVGovdW43Nm01a0x4T2hoSmVNcGhCMzRSNnJ2L0ZRRFVaRnNrQVMzOWZxWThxNUNmdm1BQ0IrU2xNSWJ3bEpORXFBRGtvMFZoYVlNYnJkenpSZGRLV2I2Ly95ekJjckN4WGkvOTZYekxsZDZFcHpUaGkvd0FjSVk5RVVveDVSOU5INHJwRHhDVy9QUXZxOFNMaHd0NjlXalZ3a28vd2xNYUVxRUNrSXpmZ3NxaVhENXR5Q0tRWHU0Q1BrbCsrcC9JYThHQUluNzZFV0ZIUTc1QUQ4SlRtaE9oQXNCaE5rU2FDSHVxNVlrcEg0RlhzRTErK28rQUMrdmMybjM4NlFFSEI5S3dTeVYyckJIVVBnSVFreXVvc0MxM0MyZjZqekhyTEpDN2Vwdnc5Nk11bDJBTHdmVmZzeC9rUDlFZUtkVDdJb0dKRlJWbld0SEo3K3JhODlLdGNnQmdOK1FrSmJRVzcydUthR2xQWk82ZlJwbWxTOVRyejBOT0h6VDNzMmhGZUVwdnY5ZXJQZmQzckhJQUJPUUtLcnlUdTNNejhWZngxUzltekYyMHpWVy9meHBoRlZneDdJL3d6QkhlSGFzVG5qS0dXNmdBY0lDdGtNTVVEM3hrbW55bGVuNDZVWUpyMHRPZjMyem5ET0VwYzRsUUFWaVJOZ1oreXowdmhuV2tXdC9tUGxibXQyTmUrUjJWems5bnZmanBzV05ieVQ0T1JWUmU5NW5pWmNtSlVBRmdtMzJRQTVRTjhVbFJsbE0zUDUwWW5rNzV1YjNOU2xGdGpSd3d0Mnl5TGdKOEpFSUZJQWZORER6S1BTTUdONkw2M2t2clFXaCtCYldzb3ZucGxQcW9jRTl6eW1jMDIvbUs4SlNKUktnQThDMmJJRjlSTVBDazFTRzArT1FxbXA4T1ZpRTVmVlRxdzdJVzRTblRIUzdDNHYwS0FLSG9hdUF1OTF5WTBuOXFlaThMWHZ2TlBSSHVLdWFuZ3d1eFFobjlOamd5dHNLeWgvQ1VJSDZYNHM3eXNOWUJFSWR1bjRDVUNyemtOSHBleGZ4MHBPSTFxcWtpRHVFcG9ZaFFBUUJXbDd2Sm45aDJGdWw0dCtzbjJoWFVJaTlsUTduOGROZ3JyL2FkL1hjTUFoRUlUd2xJaEFyQTZ0eVdJQlJGQWh2T3JOZ20xNlZhZmpveVBCM3pnNVl3TEVvMnBYbEplRXBZSWxRQTJNLzJSeWo2L0s3TTkwdThLNmp2RkprTHRmTFRNWXFVenJjTUMxTUlUd2xPaEFyQTBuUTdCS0UxYXN0NGpqRjRDVDMyNHhURFhhSDhkTXdyMTBCc0dEQTRKamFQaEtjc1FZUUtBRHZaK3doQ3F6K0ErWDRKY0FYMTR3UFVtUXVGOHRNQjZ0VE5ZWWFJWVlTbkxFMkVDc0FxdEQxTXB5TnF5M2lPOUhFSmJmczZCdis0VEtya3B3TXFRTit3VSsrQk10dTV6QzREcXdIZk9sT3hGajBBU3JIeE1aMXVuOEVHUjZqN2YyNnB1VkFsUCsydFZOR2NaN2hJVEhuVFNzUE9CZ0M2MHY4dzBlQkdLSDIxaDJvc1F6MU1QM3VLYXZ4UUZCbjgvZVNuRGFSZlFKZGpuaGMzc1FDc0JyUWxRZ1dBMyt4NlFES0RJOVFtMytLdmR2ajlNL3NCUnJDL0JuUzlYcjBYZWhDZWtzeisxZkoydXlsQ0FHYlIzak9GeTZkdEJaekZXdHhIUDZOeGZremUvUmR1dDV2dzlDWDNUODhxV0RTdEdEcWFFNTZTa2x1b0FQREVsc2RGR1pCTGhMOGZhMDV0eUorZmRuMzlFcE9UK2cyZ2FWK1FsMDVpSWxRQTRuTTRJcmYwRlI2MmpRejdZTTN0ajFCN2pNbisvMmI2dWZCUy92d1VxR0R1bmxwei8yQXdFU29BUExMZkZhY0FTT21ybnIvVkxQanFQMVgyOENzL1BhNXMwYlRsQ2lybkNVOHBRb1FLUUhENklySktYOXZCdThmZ2o5ZldWOFYyTWtYOTluK2VmaUpzU0o2ZjlwdGpsWXVtT1lQSkdjSlRlS2xVbHdsQVRUYTdzcng2Y3Z2Mm1IbjdWNmYvKzJOUGxjeWYyUThBY0p6d2xHcjhkV01BZ3JOVmtVLzZ0bitKT2Z2enArZUxPTGFXdWtUWVQvTDdwNTJvbStZNkRla1Myd0NIQ1UrcHliZjRBZUNIemE0Z0w1MGk0aHc1NHp6SlJQSlRZRW5DVXlvVG9RSVFtVTZKVE5MWDgwTHQ0a0tQMnNyMDhydGVyOU9mSVlqTStXbW5xYVYwT2pHdzdDYzhCUkVxQU56WjZVcnh1cWxtWW9McDVQc29jMzRLcENROGhUc1JLZ0JoRFc2WjdIUjBvdm1QcHV4a0gxeUtycDMrSmovOWpnTHFxc2Z3bGwxZXN4S2V3aU1SS2dCaGFaeG9Uai9UbkNGZHlMQk0wK3I5a3Z3VVdJYndGSDRUb1FMQXhUWkhCL3AvQXVxWG9sNy8xZU0vbm9EOEZGaUQ4QlRlRWFFQ0VKTU9pb2EwTWMwdE9xU0xQblpiRGJOT3NlbE9mMlkvUUM4OVpwUjZHdUI2dlZvTitVMTRDcTNjYmpjbERVQks5amdhVWtzczRYZWhmanc3cSsxajB1YW5BRTNZWFZqQ1YvLzQ1SGdKd0RDdVI5Q0VLbXB1NlNIVnpXNHdNcDM0L2o3NUxiMHhjSm42QnUwOUxPU3JjclV3QXBDU0RZNG1uQUtBSi9KVHdyRlg4VWg0Q3Z1SlVBRUlTRS9GU1lPYmxnb1ZtNkFQVFBBUldJdjhkSzhLYXloRVkxT0ViNGxRQVNqTzdnWkFjL0pUSUNoL013cU9FYUVDRUkzT2lzTmNQbTB1VGZ1WDVvT3dCUGtwRUpId0ZNNFFvUUpRbWEwdERhOFNDRUorQ29RalBJWHpSS2dBaEtMRklyNEtWWnFzNjB2MmNZaE1ma3BFemZjdHErcENoS2N3aFhVU2dFenNhd2w0aVVBYzhsTWdFT0VwTlBSdFNUdWxBTkNWWG92SUt0Um55bVl2NVljaUlQbnBMaFZXVXBoT2VBck5pVkFCS011bXRqU3ZiMm5YNjlYeGltVGtwMEFJd2xQb1JJUUtRQnlhTG1LcVVKbUplN3pFSDQwNDVLZkFmTUpUNkVxRUNrQk5kclJGZVhGTCsrazhuYlBJUkg0S1RDWThoUUZFcUFBRU1iajdzcVB4VVlVVGdZa0FKOGxQZDdIV1FDZkNVeGhHaEFvQXhLY0RXZHBUd3puc3dLVnM2RTErU2xDQ3JRcUVwekNZQ0JXQUNGeEJKUTZIQW1BUCtTa3doL0FVbHVETUNRQU1vL0hvWWRpb3ZqeGt1WUpLRHZKVG9CemhLWlVkcUgvTktBRE51WUpLQk00RndFN3lVMkNDaVMyc0pnbEVxQUJFb0N2amlYNmpoN21YVHovK2Y3V2xoT2hIZmdxTUpqeUY2VVNvQUZSakkrT0pvd0d3bi93VUdFcDRDa0dJVUFHWVRudkdEMjFHRDNGRzFSVlVWdmRuOWdNczQzYTcyZDBITStENTJNd2dsT3YxK3Uyc3RCc0NzQzY3R0Q5VVFsdkdrL1RjUHdVR21SdWUydEhoSmJkUUFaaExrOFpGZDlGSHRGRjFCWldseVUrQkVZU25FSllJRllBNmJHRmNuQTVhTTU1VUlELzlncjBXamhHZVFqNzJSQUJhMGEwVk43aXBLRkp2TVZzMVYxQlpWOXI4dE1pYUNQRUpUeUcrWXpORll3ckFpdXhmMEpBREYwV2t6VStCQ0lTbnNBb1JLZ0FUYWR2S2N2bTBCeDNheFNEUW12ejBPMllnN0NjOGhiV0lVQUVvd3VZVmhCZXh1Z1BkbzJNYWk1S2ZBbDBJVDJGRklsUUFadEcvMFZ1Ukd0T1lRUS95MDY5WmpPQWo0U21zUzRRS1FBVjJydW04Z3RVZFBuYjVLMUtzU0g0S05DWThoZFdaUndCTVlRT2lueUxWSlRHRVRqTG5wLzNXUjBzU3ZDTThoUndPekNhYkl3QnJzWE5OWlBCWGQvTGs1UW9xeThtY253S0RDVStoT0IwcUFDY043dWpzWEVVNEtRQW55VThQc3RIQ0UrRXBKT01Yb1FJQVBlZ1dPaGsyc0UwT1g2NmdzaGI1NlhFbUlRUWhQSVZPUktnQWpPY0tLbTA1TEFEbkpjOVBMWlF3eHNTKzB6U0hya1NvQUVCRG1vUk8xcnA4MnZ3L3RVM1ZjVjd5L0xRM2t4QXV3bFBJVG9RS3dHQ3VvTktLOHdMUWhQejBMSHN0eFprQ1VJRUlGWURCeEY0cDZRMDZXZkh5YWFmLzREdHFqNVB5NTZjRFpxTjVTRm4rWmhUVUlVSUZJREViVmtyT0MwQXIrZlBUTVd5M0ZDUThoV3BFcUFDTXBOOUxSa3ZReWVvRDZ3b3FTeWlSbjQ2WmphWWlwUWhQZ2Yxc2tRREVaN2RLeHBHaE9VTktaU1h5MDJGdXQ1dE5sd3FFcDFEVzRRbG9md1RnQUkxZkdqcUJUbklNckN1b3hGY2xQeDI1NzVxUTVDWThoZUpFcUFCa1phdEt3Nm1oT1VOS2NWWHkwOEhzdTJRbFBBVXVJbFFBQnRJQkpqQzRBYWhUTXpvckdLWlFmanA0RGZWZGZ2SVJuZ0kvUktnQXBHU2ZndDhHbk1WOGhaL2dDdVduVTVpWnBDRThCWjZJVUFFWVF5dTROSmRQTzlGUXdVaTE4dE1wSzZtTHFDUWdQQVZlRXFFQ2tJOU5xaUdEbWNDdzQ1Z3JxRVJXS3orZFNJckt1b1Nud0FZUktnQUQ2QW5abzA2ZDZLTmdzSEw1NmR6MTFCckhjb1Nud0VjaVZBQ1NzVU0xWVJnVEdId2ljd1dWc01ybHA1ZlppWXlMcUN4RWVBcjBaazhFWUtmeGZ4QjQ1SS9qdkRySEI4VUo0MVhNVHlPNC9XdjJnOEJid2xOZ3Z6TnoxbTRJQVBuWTN4T1ljaWh6QlpXWWl1YW5jYUlaS1NyOEZtZUdBdnVKVUFIb3pSVlUzbkdDQUxvcW1wOWVnaTJ2cnFNU3pjUnFERFUzZ2ErSVVBR0FpMjI5cDJGak8vRmM1Z29xQWRYTlR5OGhZeG9wS2hFSVQ0SERSS2dBZE9VS0tyODVSQUM5bGM1UEwxSFhXZGRSbVVqaEFTZUpVQUdnTXJ0NVB4VXVudzUrQU9YS1R0WHowK0FFcVF6bWIwWUJUWWhRQWVqSEZWUWVPVVFBQThoUDExaHRidzltUHd0cENVK0Joa1NvQUZDUVRieWZPcGRQNzF4QkpSVDU2ZVVTWm5YWVNaWktEOEpUSUJSN0hBQWJYRUhsemprQ0dFTisrbzlGbDExWktrMElUNEVlVHM1dVd4c0FHL1NRQWRtNys2azV0cVk1Y2NoUC83UDZ6SlNsY296d0ZPaEhoQXBBRHJha2dCd2xlcWc1cWlZNEg4bFAvNUptcGJqOWJmYmpFSmZ3Rk9oTmhBcEFKNXJKVUd6Wi9SaGJtRTUrK3V4NnZlYmJobVdwdkNROEJjWVFvUUtRZ1Awb0ZLZUpIZ0tPcXI4aVJSRHkwOWNDcmhxdHlGSzVFNTRDSTRsUUFlaEJWeG1FbmJvZll3c1J5RS9mcXJBVCs1cC9XY0pUWUR3UktnQ3JzeGtGNFVEUlE5aFJkUVdWQ09Tblc4SXVINTNJVW9zUW5nS3ppRkFCYUU1N09kM2dEYnJVRzlmOFFCRHkwdzlTL2pyVVBXU3BXUWxQZ2FYWmxRQ1l5MDVFU3NGUGFxNmdNcDM4ZEpmZ1MwbHZzbFNhS0Q2UGdMdnpTNEhOQ0lBbitzeUpYRDd0Ujg4RGNjaFA5eXA3RWZXSkxKVmpUQi9naHdnVmdLWFpobjRZaWh5V09LeTVnc3BjOHRQdkxMR3NEQ05MWlNjVEIzZ2lRZ1dncmNFTnAyMW9pbExIQ2pVR29jaFB2K1lpNmt1Q1ZONHhYNENYTEE0QXNEU252eHdXYXNsY1FXVWkrZWxCVXRSM0JLa0E3SFJ5SjdYWEFQRElGZFRjSE1DQmllU25wMGhSTi9oMlB4ZGREdkNKQ0JVQVZtUUw3bXJZOEM1M1huTUZsVm5rcHcxSVVUOFNwTlprWGdCN2lGQUJhTVVWMUt5Y0xJQzU1S2ZOU0ZIM2tLTFdZVG9BdzloWkFHQWtPMjlYTHA5dVcvU3hXWjM4dExIcnYyWS9TR2l1bzZabkNnQmZPYjlvMkZNQXVITUZOUitIQzZZd3Uza2tQKzFGaXJxSElEVWxsUThjSUVJRmdDWFljTHR5K1hTUHBSK2VSY2xQKzNJZGRTY3BhaHFxSFRoTWhBcEFFNjZnWnVKOHdVUm1Oei9rcDRNSVV2ZVFvcTVPaFFNbmlWQUJhRUpmMm9sOXRpdkRDMkhKVDBjVHBINGtSVjJVcWdhYUVLRUNzQnhiVHllT0dKMGtHTmhoSDhIczVrNStPbzBnZFpzVWRTMHFHV2hJaEFyQWVSclU1bXl2WFJsZWlFeCtPdC8xd2V4bkNVZUt1Z1NsQ3pRblFnVmdMZmFkNXB3eU9ra3pzSzZnTXBMOE5CWkI2a3RXcThpVUt4Q1c3UU9nT0oxcVEzYlZyZ3d2QkNjL0RjcWwxQ2N1b3Nha1BvRittcXd3OWc0QWhySHBOT1NnMFVteWdYVUZsV0hrcHd1UXBmNndab1dpSUlIZVJLZ0FuS1JsYldMd1pscnRyZWxWSUQ3NTZXSmtxUzZpQmxHMkFvSEJSS2dBTE1TT1EyUXBEM0d1b0RLRy9IUmhsYk5VSzlkY0JVc09tRWlFQ3NBWmczdlhmRHVPeTZkZDVTc1lTRWwrbXNUMWI3TWZad1RiREVBZElsUUFtTUx1bVViaW9NQVZWQWFRbitaVUpFdjFYZjRwY2hjVkVKWUlsWVpVQWdjb202VzVncm9LWncwZ0p2bHBmdW16Vk4zSlNGbXJDRmlDQ0JVQVJySnA5alpzaE5PZjQ5Si9RS2FUbjlhU05VdTFyNCtSckd5QUZZbFFBVGpHRmRUNEhEZUl6OVF1UzM1YVY3SXMxU3JXVzQ0NkFiaXphd0RBTm50bGJ5NmZ0bFhrWXpLTC9KVExKVXVXYW9QdlorbkNBSkpwdFNMWk5RQ3FjUVUxTWljT1ZtRnExeVEvNWRuU1dhcUZySWNWS3dISVRZUmFoejJJOUJRNU1ka2llM1A1dElkU0g1YkI1S2RzV1RGTHRkTURWQ0JDQmVBQVYxQmpXdWk4Q1JkVHV5VDVLWHN0RktSYXk5b3lua0JNSWxSZ0dBc0ZwU2o0M2x3K2hlWElUL25hRWtHcUxiOHQ0d25FSkVMbE1DOGR5bklGTlpyZ1IwdldNcXljVE8xcTVLY2N0MFNRU2l1MkJ5QW1FU29BTkdSRDdNMEl3NHJrcHpRUU0wVzFMVFZuU0lHWVJLZ0FmTVVWMURnQ0hpVFRLRHUycnFEU2cveVVaZ0ttcUphejVnd3BrSnRWRHFDSWFDZVhJT3lEdlJsaFdKVDhsTVo4cVQ4OVd6NFFVTU45eHlvSFFITTJsNWNjRy9zcFByYXVvTktjL0pSZWdxU29sck1lakNvUWtBZzFxMzd0aEJmTlR2MUtKVUszWEpueGYySlY3TTBJdzdya3AvUVZJVVcxUy9WZ1ZJR0FSS2dBaEdWbmVUTDluSmlZc2IyNGdrcHJmMlkvQUNWY3IxZHJTajYzMjgzR0RFVFRjTWV4eWdHa04vaWNFbmxuY1Y3cmJYQ2xEZnRaVUlUN3B3d3k5eUtxL2FPVDIrMW1iSUZvM0VJRmdPREM1c2dBTDhsUEdjbzJtWko4QVloR2hNcE8zaThmS1pMMEJwOVFZbGJVNEtjcWVDcU0rZDVweGZ1dFFIN0thTE11b2xyUnVqSzhRRFFpVkFBQW9BbjVLWE1VL0NmSDlPUUxRR0tXdUxtMERhU2tzT01vZmdYVjVWTTRMOXE4cGpuNUtkT012NGhxUmV2TkNBT2h0TjFsTEhFQTVHTjNHOEFnUXdMeVV5Ynp6NC9KYUE2QVVPd3lmR1RuWW9QeXFNUEZqakhzeXlSV2RsNFhJVDlsdnBHYnFCVnRBSU1NaE9JWG9RTEFTL2ExQVF3eTVDQS9KUVQvRHBtTUxnRUlSWVFLd0VldW9QYm0wRWQ2QmVkMUhmSlRvaGkybTFyUnhqRE9RQ2dpMU5WMTdSTzhVMTdxV2hpQ0pLYXo5QTFna0NFTitTbUI2Q09UMFM0QW9ZaFFBZGptQ21vL3pub1VVV3BlbHlJL0pSYmJhakkyRHlBVUVTb0FYT3hpUXhoa3lFUitTamdESWxRNzJVaEdHOGpLK3BhSnQ4a1RKVkdXSzZnOXVDVkRLVVhtZFRYeVU2QTcrd2NRUjlzam5QVnRKTWR2MGxETXpHWHpHc0FnUXpMeVV5TFNVK2FqZ1FEaUVLRUNzTUVWMUxZYzdpZ28vYnd1U0g1S1VIYlpUaVlPN08xMnM0c0FRWWhRK2MxNzVJZGlJUEZoUkhrUFlKQWhIL2twUlZYZTB1YTJnNVZISGdoRmhBcEFFSWsza2NSSk5GQ0svSlM0N0xYOWlGQUJMaUxVQmVrTkdLRDNYRmJHcTBqNXBteFZBeGhrN2xSQ012SlRRa3ZadFFRaFFnVzRpRkQ1bXpjSXpKSnkvWEdhQTlLUW4wSmRJbFNBaXdnVmdEZVMvU0VwTzlRQUJwbEg2aUVUK1NuUitVZkxya1NvQU0xWjNMcnF2WE41ZmNYNThqNjBvdHFCVE9TbjFPV0FkQ2RDQldpK0VscmNBSEpJY3dWMThNWWtQSVU3UFdFYThsTkFoQW9nUXVVLzNsMVpYajF3aGpVRUVwT2ZzZ0QvZWptQUNCVkFoQXAwcGFkZFZJSXJxQzZmd2tRYXdoemtwOEEvUktnQUl0UWxETml3dkxpQ3ZIU3lVdHRqR0dmSVRYNEsvRWVFQ2lCQ0JlQkpnaXVvdzdoOENyOHRQYW01K3pQN0FkcG9XNHRXL0lDdTE2c1ZaNHk1UTMyNzNVeEFZTHJtSzZIRnJia0J1NVczVnNxQTVrYzVNWVV6MUJqR0dkSnoveFI0NWhZcWdGdW9BRHh5QlhVUC8wNEE3eXc2cWZraFB3VmV1RjZ2RTdzZld3c1FnUWdWcjZ3SUw1cXMxUFlZeGhrcWtKKytZUG1ET3hFcVFGc1d0NGJjY21JaHlqVUhWMUMzcVhQWXR0eWs1bEdTMzM5S0JYNEY2aFFUaC8zK2MvVmh3RVE5MWtDL1ZYTXQzbGQ2Mmt1eVV0dGpqQnhuKzFFLzVnc2Z1WDhLZk9EWG9RS1Y5VmdEcld4UWlzZ2pFMWRRMzFIbnZSbGhtRXQrQ253bVFnVXFFNkdHTldaNzhySVM4M0xKU20yUFlaelRHSGJnVlRQcmtwOVNtc1ZyUHhFcVVKa0l0VGd2S3lXdmxXTmNRZjNOMWNqZWpEQk1KejhGOWhLaEFwV0pVR055cENRNEpjcDROcGN4akhNeXJxQ3lUWDRLZkVHRUNsUW1RcTNNbTByR0MrVU1WMUFmK1VlQzNvd3dSQ0EvZlMzNEZnVVRpVkNCeWtTb0FUbFlFcGJpVEN4c2hHcFBHY000cCtRS0todmtwOERYUktnQWJWblpsdUExcGVGVlFpditrYUEzSXd4QnlFK0JJMFNvUUZtZEZrQXIyeEs4cGdTR3ZVU3BSM29CcjZCYW84WXd6b201Z3NvNzhsUGdJQkVxVUpZSU5ScEJGVHVaWmRDUXRiYzNJd3h4eUU4cHpZWjBrZ2dWS0V1RVdwWjN4QjZhekNKQ1hVRzFPa0VUcnFEeWt2ejBMYVVNZTRoUWdiSkVxS0dNM0krOG8wVjVjZEJRMlg4azhEdEFvQ2I1S1hDV0NCVW9TNFJhbG5lMG5KR3ZUT3BSU3BBcnFJTVhKVVZPYnE2ZzhwdjhGR2pnZXIxTzdLTHNPc0JFSXRRNG5PY0I2TXJsVXlnclNYNXFjWUVJNWthb3NnWmdGbjFJVGZhZGhiaDhTbGZUcjZDNmZBcnIwazZzSWtsKzJvazZEc1hyV0lMdjhnTzBzckdtT2J1K016M0ZJQ0N2aWR4VStEQXVuNWJpTGZCRWZnbzBKa0lGQ2hyL0xYNXQvVHNpVkI2NWw4Y1lkVlllUlE3VUpEOEYyaE9oQWdXSlVNdXk3NFRsMVpDZUloL0c1ZE9DL0JVcEhzbFBQMURIY0l3SUZTaEloQnFFWWVFeW94bFFlTVZWdUlLcXlJR3k1S2RBTHlKVW9DQVJhazAySFdBOEs4OHdocm9zVjFENWtTYy83VmZXNmpnQ2IyRlJJbFNnSUJGcUJPUEh4S1lUaXN1blRKRzdESEovdWlBTU1vU1ZKejhGWWhLaEFnV0pVR3V5NlFRaFBBVWFzcllYNXdvcWQvSlQ2dExwRGlOQ0JRb1NvVTQzWlVCc090TjVCY3lWZFNuTytybENNY2dRbWZ4MEYzM1lYTVkvQVJFcVFDc2kxUDFFcU5YNGl6cEFXNVowTHE2Z2NybGM1S2ZBTUNKVW9Kb3B2NXhkbEJPQlRXY0t3MDRRK2RiaGZKOG9JSU1Nd2FYS1Q3dXVPQm95T0UrRUNsUWpRcDF1MW1qWWRBYWJOZUNtR3k4cGpCeXM1UHh3QlpWVStTa3BXVDZTRWFFQzFZaFFweE9ocGljOGhYN1UrUUFHR2VLVG4zNUJFNXlKTFdvaUVTcFF6WlFJbFFpOG9BRU1NakU1YnF6TzJzSVRWMUNMeTVhZjJxVmdDZE1qVkhzU01OajRDRlZUOUdqaWFOaHh1cG80dktZWUZhanpBUXd5TENGYmZ0cWJEbmd3QTU3WTlYcWRucUpPL09sQVFTTFV1VVNvK1FoUENVNmRRREt1b0ZZbVAvMmFPb2FHUktoQUtTTFVzdXc0elJsUzZLM3lEakpzaGFrOHlMQ1doUG1wQlNpTmZwdVdJZ2xGaEFyUWhBajFvK2s3amsybmlla2phVTZ4MzdyVnN1NlRRMWVtUmxrSjg5TUI5TDdRMXZRRDdjU2ZEbFRUZGNVVG9YNDBmU2hzT2lkTkg4RHBKUVQwNXZJcEVVemY3M2dpUHoxSUtmZG1oS3NSb1FKMWlGRG5tajRVTnAzRHBnL2Q5T0poUlN1V3pZclBETU9ZSURYbHpFOVY4K3E2TnNmS0l5d1JLbENIQ0xVNG04NjNwbjluSHlqQzVWUGlzUEdGa2pNL0hVTXBRM01pVktBT0VlcEVFY1pCSUxoZmtJR0tVRFlzYXEzaVdldHBZUXJUcEtDMCtlbVlhZzdTekNWalZJc1RvUUoxaUZBbkNqSU85cDJQZ2d4UmtJSUJ1bkw1bEdpQ2JJSmNFdWVudzZqbXRucVBwNDFxQ1NKVW9BNFI2a1JCeHNGRjFIZmlqRXlRVW1GcHExVFJLczhKTUZqbS9IVFkwaCtrc1lOTVJLaEFIU0xVaWVLTWc2M25TWndCaVZNa1FGZHhsaDJXSUhHcUpuTitPcEtDYnNJdzhraUVDdFFoUXY2K1Bic0FBQXFPU1VSQlZPVVM2YnJsWE1hQnJPS3Z1dkdmTUFmakRDdEtucCtPWEpqMGVTY05HRUFiMVhKRXFBQk5pRkEzUkJ1RXl1bGh3TThlclR5QVRxSXRQaXpCRmRSU2t1ZW5nNm5wd3d3ZDc0aFFnU0o2TDNjaTFBMEJCNkhnQmhUd0l3Y3NERllYdWFnaVAxc214aGtXbFQ4L0hidzhCZXo4NGhzemFEYXFkVTJQVU0xcllJeUpFZXFQcmc4UVdjRFBYbWNEaXZsSkE1WUUwRW5BSlloVnVJSmFSLzc4ZER4bC9SWER4UjdUenpBS0ZSaGpWb1RLSmNCZTgxTE1iTEdWc0o4dVpqR1FROHpxaXZsVStSaG5XRmVKL0hUOEloV3pFUXhvMkVEWnFCS1lmakhLdkFiR0VLRk9GTFpodVAxcjlvTzBFZnpqaEMwRG9JZXdheEdyY0FXMWlCTDU2UlFxK3lORHhBRWlWS0FDRWVwRXdiT3p5TEhqSHZHZlAzZ0JrRU8wTW92MlBGa1paMWhhbGZ4MHlsSVZ2MEdjWmZESTJLaVNFYUVDRlloUUo0cmZPUVMvdi9uYktnOGMvOVdUaG1LRFRNem9DcXJrcDVkNUJSMi9VeHhzOElCWXlGSVNvUUlWaUZBbldxVi9pSjlMQm4rOFI2dThkR2lyZU9YN2hYS3NaWlV0TmFWQytlbEVDeldPdlJrSFdoR2hBcHhuTmR1dzFsazNWSkI2ZXpEN1dmWmE2M1dUZzZxRFRNem85R3JscHdLWGlhYjAwSmF3M014b0lMMEJDNTNWYk1PS2pjU3M3SExGelBUSGlpOGFtaWhlL0M2ZnNxSVY5OWtjS2s3ajZkVldiZldjTmVCTGozTy9RVnQ2V0Y2YU82UHpqZWRoZFlxMjB5ZU45akVKWmNCQ3B3STNURzhkVzJuN2xnMExOS0dWblVoK1NuTmppa3BGVFZGMDBDTTBmQlVxWGpkd1dKMG9xZ21WRmtHZG9wV2ZNb1VJZGE0SXJXTlg3OTUrMlE4T3cweWNaY1hyWDNoS0Qrb3FzVCt6SDZDdSs3ektXdlRUdSsyc0E4dEwxK3QxWXNuZGJqZjFCdlEyWUtHem1tMll1OUVNa1B2VHZhUGdpV0RXOHFMK29ZZjBEVU5sdFg3LzZZODR1OFc2dnlqcW5RZ2ZKODc3WlJpL0N4Vkl6KzQybC9GUHhndUZ5bHdTWkhWT29PTVZ6VTh2OFJheUNMSGpTVUUrUXJRM3l6QWlWQ0M5M2d1ZHBXeWJIaU1OcjVKUXhoZWtLUUQ5bUY5WjFjMVBMeUhMZXNYcnFLR2VPZUE3WlNRUktwQ2VDSFV1blVZQ1hpSVU1L0lwT2VqWkJpdWRuMTRDcjJpM0I3T2Y1WVhnajBkbDB5TlVrd0pZblhWc1c5anVrVDI4UG1JYVdabG1BZlJtbHFWVVBUKzlyRkRaUWNMS0lJK3hJZjZyWkl6cGxSQjJqZ0E1REZqbHJHUGJwbTgwSE9QRkFUWTRNbEhQSStraC9yRnUyZlZyQk5jYWsyUU5jYi9CVHpaUUc2WVhjSjJodnF0VHRKMCthYlNQU1h3RFZqbGwrZEgwdllhZEZETkxzTEFQNE12N0RET20yRlRhTUg5bVAwQVUxK3QxMFE3NDQyTy9tMDZMZnQ2WExCbjhkcStLaVhWK3U5MVVKdERQZ05iRk92YlJ1ZzFrS2NvWXVMTmlrNDl1YlJqZjMvOVAxcHE3dlRIN3VackordUpvWXZxdlE1MzQwNEgwZkpFL0FuMUljRjRRQytsZHJxYkRNSVlhOHBHZi9zVXl0NWJyOWVxVjhaRUlGVWhNaEJxQmhpUW03d1Y0WkR0ak1IdFFNdkxUWjBwOEZkNFUrNGxRZ2NSRXFFSG9URUx4T2xoVXY5STFLWVl4MUF5bVR4dERmdnFDOVM0Kzc0aHZpVkNCeEVTb1FlaFBndkFpZ0NkMk1hYXdIMlVpUDMzTjkzMGk4Mm80Um9RS2NJWjFiQTg5NUZ6R253UjYxTEI1TVl5aFpncE4yZ0R5MHkzV3ZtajB4SndrUWdXeUdyTytXY2QyMHE1TVlkZ0JpTWJlbEliODlBTzFIb2QzUVJNaVZDQXJFV29vL3RGM0pLTk5NbTNyMmV3WXRuTVphaWJTb2ZVbVAvMU1ReGFCVjBCRElsUWdLeEZxTk5ySTNvd3dXYlVxYkJNRXBqTU5jNUNmN3FYaVo5RVcwNE1JRmNoS2hCcVFUcVlUQXd0ODVQSXBkV2pQdXBLZmZrR1FONWdCcHlzUktwQ1ZDRFVnWFUxYnhwTUt6aGU1YVFKQm1Jd0p5RSsvcGwwYnd5QXp3UFFJVmZvQWRDSkNqVWtiZVo0eEJQWnorWlJxOUdiOXlFOFAwcnIxWTJ3WmFYcXgyZUdBVHFhdmI3eWoxVG5HdUZIUW1abzNYeUFVVTNKMTh0TlRUSUMydE1WTU1iM3FSS2dBQldsNzlqTld3QUV1bjFLVDAyVW44dE96cnYrYS9TQnJNNGJNTmIzOGJISkFEd01XTjh2WFNWcWdiY1lIamswQkV3Y0NNakdYSmo5dFJudDNnUFNaT0tiWG9Rd0M2R0g2NHNZZTJxSGZqQWx3aHN1blZPWm8yWVA4dERHdDNrNEdpb0NtbDZWOUR1akJocnNLLzY1OE1Rand5cmN6d2d5Q3NFelBkY2xQdTlENXZXTmtpRStFQ3VUVGRXV3pjRFZYczFtcSthbUJIbXhNUUhONmxFR0tyK0M2NFcvMUt4anZZcWU1YzNiRjExU25hRHQ5MG1nZms1VHF6Tk5rY3JlUmlnZDIycmtVbUZNWFg5NG52REVscWo3YitqUDdBYXI0S2R6Y0hmQVQwNVYxWGEvWGliUDFkcnVaUGtCemMxYzJEa3ZaUnRybWdFNHlMWlZBSEJxWG1WS3U3THJoSmx3UkNzSXQxUDNxRkszN3A2eE9EZWV3WWh1cFNPQ2tqeFBmTEx1NGZNb2lYRUZkanZ1bk16Mlc4b3BOOEE5emtxemNRZ1h5Y1FzMWgxWGFTQnNaREdPNlhXS3ZoOERTNUtkUlBPMTJrZGQ5R3pPbENCb0FDQzVVRzZsUmhINzBwWEZZNnpocHpIUjJJNmNoK1dsUUwwdDgvR1pwcHNGRnF3cWswMk5aMDZESDhlNUZ0SDNwWGplRVlrb0NkR1dSQlFDb3FIbUU2dlFPTU1ETDFkc0tmUEdiVDFtTmlsM0wvMlkvQUFBQUUyaW1BWEt3bnNPS3pOeTF5RThCQUlwcTI3ajdWU2NBQThoY1huS1ZEOTdSb1RVaFB3VUFxTXM1RUdCcGxuRllsL203RUs4S0FLQzZWaGNUSEFNQUdNL2xVOWFsZWxmaC9pa0FRSFd0V21wZkVBTUEyRStzdVFyNUtRQUFBTUFXT1JkVUpqOEZBTUFWVkFDQUNVVHpTL0NTQUFENFI1UDAwekVBQUlCTTNEOEZBT0Fmb2s4QUFIaWlSUVlBNEMvbmI2SEtZUUVBU01QOVV3QUEvaUw5QkFDQUgvSlRBQUNlaVZBQkFPQk9ad3dBd0d0bnZzZ3ZnUVVBSUFmM1R3RUFBQUFBWHBPZkFnRHdtanVrQUFDZ0p3WUFZTXZoYi9HTFh3RUFTTUQ5VXdBQXRvaEJBUUNvVEg0S0FNQUhJbFFBQU1yU0NnTUFzTXVCTC9JTFhnRUFXSjM3cHdBQTdDSU1CUUNnSVBrcEFBQjdpVkFCQUtoR2Znb0FRQzhIdnZJUEFBQ2h5RThCQVBpQ0s2Z0FBSlFpUHdVQTREc2lWQUFBNnREN0FnQnd4UDd2NXN0YkFRQllsL3VuQUFBY0lSVUZBS0FDK1NrQUFBZUpVQUVBU0UvTEN3REFLWHUreUM5cEJRQmdVZTZmQWdCd2ltd1VBSURFNUtjQUFBQUFBSys1TEFBQVFBTWZ2OFh2bWlvQUFDdHkveFFBZ0FiRW93QUFwQ1EvQlFDZ0RSRXFBQUQ1NkhFQkFHaHA0NHY4QWxZQUFKYmovaWtBQUMwSlNRRUF5RVIzQ3dCQWUrOXVvVXBYQVFCWWkvdW5BQUMwSnljRkFDQUgrU2tBQUFBQXdHdnVCUUFBME12TGIvRzdtZ29Bd0VMY1B3VUFvQmRSS1FBQXE1T2ZBZ0RRa1FnVkFJQ2x5VThCQU9oTGhBb0F3THJrcHdBQWRDZENCUUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBSUNYL2c5OFF4NitNYytoZlFBQUFBQkpSVTVFcmtKZ2dnPT0iIGhlaWdodD0iNDcyIiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0Ii8+PC9nPjwvZz48L2c+PC9zdmc+" alt="Skinuva" style="height:28px;width:auto;display:block;margin-bottom:2px;">
+        <div class="brand-tagline">Clinically backed skincare · Amazon · skinuva.com · Walmart</div>
+      </div>
+      <div class="brand-hero-right">
+        <div class="hero-stat"><div class="hero-stat-val" id="sk-hero-revenue">—</div><div class="hero-stat-lbl" id="sk-hero-revenue-lbl">Month-to-Date Revenue</div></div>
+        <div class="hero-stat"><div class="hero-stat-val" id="sk-hero-channels">—</div><div class="hero-stat-lbl">Channels</div></div>
+        <div class="hero-stat"><div class="hero-stat-val" id="sk-hero-skus">—</div><div class="hero-stat-lbl">Active SKUs (with Sales)</div></div>
+      </div>
+    </div>
+
+    <!-- ADDED 2026-08-28 per Jaclyn -- Month to Date / Last Month toggle
+         for the Overview page, same period-pill pattern already used on
+         PPC's Blended Performance card and the Amazon/Website/Walmart
+         Sales pages. Re-runs window.initOverviewLive(key) on click, which
+         re-fetches and re-renders every KPI/chart/table on this page for
+         the selected period (see initOverviewLive's own comments). -->
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-bottom:14px;">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);">Period</span>
+      <div class="period-pills" id="sk-period-pills" style="display:flex;background:var(--white);border:1px solid var(--border);border-radius:999px;padding:4px;gap:2px;"></div>
+    </div>
+
+    <!-- ADDED 2026-09-10 per Jaclyn -- Goal Tracker, ported from évolis's
+         Overview page (which has 2 cards -- "Amazon + Walmart" and
+         "Website" -- positioned lower on the page, above the Revenue by
+         Channel chart). Skinuva only needs ONE card (Amazon), and Jaclyn
+         wants it right below the period toggle instead, since it's meant
+         to be the first thing seen after picking a period. Re-rendered by
+         initOverviewLive() on every period-toggle click along with
+         everything else on this page, from the same cfg object. -->
+    <div style="margin-bottom:20px;">
+      <div class="card-title" style="margin-bottom:10px;font-size:20px;">Goal Tracker</div>
+      <div class="card" id="sk-goal-tracker-card" style="background:var(--sand);border:none;border-top:3px solid var(--navy);margin-top:0;margin-bottom:0;">
+        <div class="card-title" style="font-size:17px;">Amazon</div>
+        <div id="sk-goal-tracker-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">
+          <div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0;grid-column:1/-1;">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card" id="sk-kpi-total-sales"><div class="kpi-label">Total Sales</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-units"><div class="kpi-label">Total Units Sold</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-orders"><div class="kpi-label">Total Orders</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-aov"><div class="kpi-label">Blended AOV</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-adspend"><div class="kpi-label">Ad Spend</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-acos"><div class="kpi-label">Blended ACOS</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card" id="sk-kpi-organic-orders"><div class="kpi-label">MTD Organic Units</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-organic-sales"><div class="kpi-label">MTD Organic Sales</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-ad-orders"><div class="kpi-label">MTD Ad-Driven Units</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-ad-sales"><div class="kpi-label">MTD Ad Sales</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="sk-kpi-pending"><div class="kpi-label">Pending Orders</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Channel Breakdown <span style="font-weight:400;color:var(--muted);" id="sk-channelbreak-title-suffix">(Amazon + Walmart, Month to Date)</span></div>
+      <table class="data-table" style="width:100%;">
+        <thead><tr><th>Channel</th><th>Ad Spend</th><th>Ad Sales</th><th>Units</th><th>Total Orders</th><th>Revenue</th><th>AOV</th></tr></thead>
+        <tbody id="sk-channel-breakdown-tbody"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- Ad Spend by Type (SP/SB/SD) — added 2026-09-11 per Jaclyn, ported
+         from évolis. Identical component to the one on the PPC page (same
+         Advertising Cache sheet, same layout), unique
+         window._ovAdTypeChart var and its own local-scoped fetch (this
+         page never fetches window.SHEET_CFG.SHEET_ADVERTISING otherwise —
+         see initOverviewLive). UPDATED 2026-09-11 per Jaclyn -- a single
+         Ad Spend circle was "only half the story," so a second Ad Sales
+         circle sits next to it (window._ovAdTypeSalesChart), same colors/
+         legend, built from the same rows' .sales instead of .spend. -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Ad Spend by Type <span style="font-weight:400;color:var(--muted);">(Amazon — Sponsored Products / Brands / Display)</span></div>
+      <div id="sk-adtype-note" style="display:none;margin-bottom:12px;font-size:13px;color:var(--muted);"></div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+        <div style="flex:0 0 220px;width:220px;">
+          <div style="text-align:center;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">Ad Spend</div>
+          <div style="width:220px;height:220px;position:relative;">
+            <canvas id="chart-sk-adtype"></canvas>
+          </div>
+        </div>
+        <div style="flex:0 0 220px;width:220px;">
+          <div style="text-align:center;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">Ad Sales</div>
+          <div style="width:220px;height:220px;position:relative;">
+            <canvas id="chart-sk-adtype-sales"></canvas>
+          </div>
+        </div>
+        <div style="flex:1 1 320px;min-width:280px;overflow-x:auto;">
+          <table class="data-table" id="sk-adtype-table">
+            <thead><tr>
+              <th>Ad Type</th><th>Spend</th><th>Sales</th><th>Units</th><th>ACOS</th><th>Campaigns Running</th>
+            </tr></thead>
+            <tbody id="sk-adtype-tbody">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col" style="margin-bottom:22px;">
+      <div class="card" style="margin-top:0;">
+        <div class="card-title" id="sk-donut-title">Revenue by Channel — Month to Date</div>
+        <div style="position:relative;height:200px;"><canvas id="chart-sk-donut"></canvas></div>
+      </div>
+      <div class="card" style="margin-top:0;">
+        <div class="card-title">Monthly Revenue Trend</div>
+        <div style="position:relative;height:200px;"><canvas id="chart-sk-trend"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Top Selling Products <span style="font-weight:400;color:var(--muted);" id="sk-topproducts-title-suffix">(by Units, Amazon + Walmart, Month to Date)</span></div>
+      <table class="tp-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:var(--navy);color:#fff;">
+            <th style="text-align:left;padding:8px 10px;">#</th>
+            <th style="text-align:left;padding:8px 10px;">Product</th>
+            <th style="text-align:left;padding:8px 10px;">Amazon</th>
+            <th style="text-align:left;padding:8px 10px;">Walmart</th>
+            <th style="text-align:left;padding:8px 10px;">Total Units</th>
+            <th style="text-align:left;padding:8px 10px;">Ads (Amazon)</th>
+            <th style="text-align:left;padding:8px 10px;">Organic</th>
+          </tr>
+        </thead>
+        <tbody id="sk-products-tbody"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+`;
+
+function activateSkinuvaSummary(containerEl) {
+  if (!containerEl) return;
+  containerEl.innerHTML = SKINUVA_SUMMARY_HTML;
+  window._skinuvaLiveInit = null;
+  if (typeof window.initSkinuvaOverviewLive === 'function') {
+    window.initSkinuvaOverviewLive(window._skinuvaActivePeriod);
+  }
+}
+
 const brandData = {
   evolis: {
     name:'Évolis Professional', meta:'Hair care · Amazon · Website · Walmart · May 2026', url:'https://evolis.medaltus.com/',
@@ -2311,6 +3970,8 @@ function selectBrandA(btn, name, id, url) {
   currentNameA = name;
   if (id === 'evolis') {
     activateEvolisSummary(document.getElementById('a-cards-content'));
+  } else if (id === 'skinuva') {
+    activateSkinuvaSummary(document.getElementById('a-cards-content'));
   } else {
     document.getElementById('a-cards-content').innerHTML = renderCards(id);
   }
@@ -2396,6 +4057,9 @@ function selectBrandB(id, btn) {
   if (id === 'evolis') {
     const container = document.getElementById('b-evolis-cards');
     if (container && !container.hasChildNodes()) activateEvolisSummary(container);
+  } else if (id === 'skinuva') {
+    const container = document.getElementById('b-skinuva-cards');
+    if (container && !container.hasChildNodes()) activateSkinuvaSummary(container);
   }
 }
 
