@@ -693,6 +693,62 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
   const OV_WMT_RETURNS_SHEET_ID = '1XxYmX0NT-4bqKh4N96zNAPIAzctXDQaK6Yzp6hVWjJc';
   const OV_WMT_RETURNS_GID      = '344983459';
 
+  // These three were also called by this module but declared at top-level
+  // scope elsewhere in Évolis's real file (outside this IIFE) — missed by
+  // the earlier dependency scan since it only checked for ALL-CAPS
+  // constants, not lowercase helper functions. Confirmed via a live
+  // "ReferenceError: ovCsvUrl is not defined" once this ran in the hub.
+  // Inlined here now, verbatim from the source.
+  function ovCsvUrl(id, gid) {
+    return 'https://docs.google.com/spreadsheets/d/' + id + '/export?format=csv&gid=' + gid + '&_cb=' + Date.now();
+  }
+  function parseCsvFull(text) {
+    text = (text || '').replace(/^\uFEFF/, ''); // strip BOM
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
+    let i = 0;
+    while (i < text.length) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; } // escaped quote
+          inQuotes = false; i++; continue;
+        }
+        field += ch; i++; continue;
+      }
+      if (ch === '"') { inQuotes = true; i++; continue; }
+      if (ch === ',') { row.push(field.trim()); field = ''; i++; continue; }
+      if (ch === '\r' && text[i + 1] === '\n') {
+        row.push(field.trim()); rows.push(row); row = []; field = ''; i += 2; continue;
+      }
+      if (ch === '\n') {
+        row.push(field.trim()); rows.push(row); row = []; field = ''; i++; continue;
+      }
+      field += ch; i++;
+    }
+    if (field || row.length) { row.push(field.trim()); rows.push(row); }
+    return rows.filter(r => r.some(v => v));
+  }
+  function parseCsvToRows(text) {
+    const all = parseCsvFull(text);
+    if (all.length < 2) return [];
+    const headers = all[0].map(h => h.toLowerCase());
+    return all.slice(1).map(vals => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (vals[i] || ''); });
+      return obj;
+    }).filter(row => Object.values(row).some(v => v));
+  }
+  // Also called by this module (Goal Tracker section) but only actually
+  // declared in Skinuva's separate script closure — invisible to Évolis's
+  // own IIFE at runtime. Same class of bug as ovCsvUrl above. Depends only
+  // on parseCsvLine, already declared locally in this same closure below.
+  function parseCsv2D(text) {
+    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.length > 0);
+    return lines.map(parseCsvLine);
+  }
 
   function sheetCsvUrl(id, gid) { return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`; }
   function isCsv(t) { t = (t || '').trim(); return t.length > 0 && !t.startsWith('<') && !t.startsWith('{'); }
@@ -2083,6 +2139,14 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
   const OV_WMT_RETURNS_SHEET_ID = '1XxYmX0NT-4bqKh4N96zNAPIAzctXDQaK6Yzp6hVWjJc';
   const OV_WMT_RETURNS_GID      = '335941769';
 
+  // Same missed external dependency as Évolis's copy of this module —
+  // called by this script but only ever declared at top-level scope in
+  // the real dashboard file, outside this IIFE. Confirmed via a live
+  // ReferenceError once Évolis's copy ran in the hub; fixed here too
+  // since Skinuva's script calls it the same way.
+  function ovCsvUrl(id, gid) {
+    return 'https://docs.google.com/spreadsheets/d/' + id + '/export?format=csv&gid=' + gid + '&_cb=' + Date.now();
+  }
 
   function sheetCsvUrl(id, gid) { return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`; }
   function isCsv(t) { t = (t || '').trim(); return t.length > 0 && !t.startsWith('<') && !t.startsWith('{'); }
