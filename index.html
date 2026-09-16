@@ -314,7 +314,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
       <div class="bs-search"><input type="text" placeholder="Search brands…" oninput="filterBrands(this.value)"></div>
       <div class="bs-list" id="a-brand-list">
         <div class="bs-section">Live — Newderm Seller</div>
-        <button class="brand-item active" onclick="selectBrandA(this,'Évolis Professional','evolis','https://evolis.medaltus.com/')">
+        <button class="brand-item active" onclick="selectBrandA(this,'Évolis','evolis','https://evolis.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Évolis</div><div class="bi-sub">Hair care</div></div><span class="bi-tag">3ch</span>
         </button>
         <button class="brand-item" onclick="selectBrandA(this,'Skinuva','skinuva','https://skinuva.medaltus.com/')">
@@ -335,17 +335,8 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
         <button class="brand-item" onclick="selectBrandA(this,'Just Bjorn','justbjorn','https://justbjorn.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Just Bjorn</div><div class="bi-sub">Personal care</div></div>
         </button>
-        <button class="brand-item" onclick="selectBrandA(this,'Prohibition','prohibition','#')">
-          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Prohibition</div><div class="bi-sub">Lifestyle</div></div>
-        </button>
-        <button class="brand-item" onclick="selectBrandA(this,'Eraclea','eraclea','#')">
-          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Eraclea</div><div class="bi-sub">Skincare</div></div>
-        </button>
         <button class="brand-item" onclick="selectBrandA(this,'skinside SEOUL','skinseoul','https://skinside.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">skinside SEOUL</div><div class="bi-sub">K-beauty</div></div>
-        </button>
-        <button class="brand-item" onclick="selectBrandA(this,'PB & Jay','pbjay','#')">
-          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">PB & Jay</div><div class="bi-sub">Snacks</div></div>
         </button>
         <div class="bs-section">Live — VB Cosmetics Seller</div>
         <button class="brand-item" onclick="selectBrandA(this,'VB Cosmetics','vbc','https://vbcosmeticsreport.medaltus.com/')">
@@ -355,6 +346,15 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
         <button class="brand-item" onclick="selectBrandA(this,'Amala','amala','#')">
           <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Amala</div><div class="bi-sub">Skincare — launching</div></div>
         </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Prohibition','prohibition','#')">
+          <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Prohibition</div><div class="bi-sub">Lifestyle — launching</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'Eraclea','eraclea','#')">
+          <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Eraclea</div><div class="bi-sub">Skincare — launching</div></div>
+        </button>
+        <button class="brand-item" onclick="selectBrandA(this,'PB & Jay','pbjay','#')">
+          <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">PB & Jay</div><div class="bi-sub">Snacks — launching</div></div>
+        </button>
       </div>
     </div>
 
@@ -362,7 +362,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
     <div class="brand-content">
       <!-- Content bar with view toggle -->
       <div class="content-bar">
-        <div class="content-breadcrumb">Hub &rsaquo; <strong id="a-brand-name">Évolis Professional</strong></div>
+        <div class="content-breadcrumb">Hub &rsaquo; <strong id="a-brand-name">Évolis</strong></div>
         <div class="content-bar-right">
           <div class="view-toggle">
             <button class="vt-btn active" id="a-cards-btn" onclick="setViewA('cards')">
@@ -423,12 +423,12 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
       <!-- All brands view -->
       <div class="brand-view active" id="bv-all">
         <div class="b-view-bar">
-          <div><div class="b-view-title">All Brands</div><div class="b-view-meta">14 brands · 13 live · 1 building · May 2026</div></div>
+          <div><div class="b-view-title">All Brands</div><div class="b-view-meta">14 brands · 10 live · 4 building · May 2026</div></div>
         </div>
         <div class="b-cards-scroll">
           <div class="all-grid">
             <div class="bc" onclick="selectBrandB('evolis',document.querySelector('.brand-tab:nth-child(3)'))">
-              <div class="bc-hd"><div class="bc-name">Évolis Professional</div><div class="bc-status st-live">● Live</div></div>
+              <div class="bc-hd"><div class="bc-name">Évolis</div><div class="bc-status st-live">● Live</div></div>
               <div class="bc-stats">
                 <div><div class="bc-stat-v">387</div><div class="bc-stat-l">Units</div><div class="bc-stat-m dn">▼ 6%</div></div>
                 <div><div class="bc-stat-v" style="font-size:12px">$17.5K</div><div class="bc-stat-l">Revenue</div><div class="bc-stat-m dn">▼ 4%</div></div>
@@ -480,7 +480,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
       <!-- Évolis brand view -->
       <div class="brand-view" id="bv-evolis">
         <div class="b-view-bar">
-          <div><div class="b-view-title">Évolis Professional</div><div class="b-view-meta">Hair care · Amazon · Website · Walmart · May 2026</div></div>
+          <div><div class="b-view-title">Évolis</div><div class="b-view-meta">Hair care · Amazon · Website · Walmart · May 2026</div></div>
           <div class="b-view-right">
             <div class="view-toggle">
               <button class="vt-btn active" id="b-evolis-cards-btn" onclick="setBViewMode('evolis','cards')">
@@ -3961,7 +3961,7 @@ function activateSkinuvaSummary(containerEl) {
 
 const brandData = {
   evolis: {
-    name:'Évolis Professional', meta:'Hair care · Amazon · Website · Walmart · May 2026', url:'https://evolis.medaltus.com/',
+    name:'Évolis', meta:'Hair care · Amazon · Website · Walmart · May 2026', url:'https://evolis.medaltus.com/',
     kpis:[{l:'Total Units',v:'387',m:'▼ 6% MOM',t:'dn'},{l:'Revenue',v:'$17.5K',m:'▼ 4% MOM',t:'dn'},{l:'Blended AOV',v:'$45.20',m:'▲ 2% MOM',t:'up'},{l:'Ad Spend',v:'$1,240',m:'0% MOM',t:'fl'},{l:'ACOS',v:'8.4%',m:'▲ 1.2pp',t:'dn'}],
     channels:[{n:'Amazon',v:'263 units',s:'$9.6K · 68% share',w:68,c:''},{n:'Website',v:'86 units',s:'$3.8K · 22% share',w:22,c:'green'},{n:'Walmart',v:'38 units',s:'$1.8K · 10% share',w:10,c:'slate'}],
     flags:[{t:'w',x:'Amazon organic units down 6% MOM — monitor for 2nd consecutive month',tag:'Sales'},{t:'ok',x:'Website subscription rate 18% — new high, trend intact',tag:'Website'},{t:'w',x:'1 insight pending leadership approval before going live',tag:'Insights'}]
@@ -4024,7 +4024,7 @@ function renderCards(id) {
 // ── Option A logic ──
 let currentViewA = 'cards';
 let currentUrlA = 'https://evolis.medaltus.com/';
-let currentNameA = 'Évolis Professional';
+let currentNameA = 'Évolis';
 
 function selectBrandA(btn, name, id, url) {
   document.querySelectorAll('#opt-a .brand-item').forEach(b => b.classList.remove('active'));
