@@ -39,20 +39,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .hub-user strong{color:rgba(255,255,255,0.65);}
 .internal-pill{background:rgba(36,233,163,0.15);border:1px solid rgba(36,233,163,0.22);border-radius:20px;padding:3px 10px;font-size:10px;font-weight:600;color:var(--green);letter-spacing:.05em;text-transform:uppercase;}
 
-/* ── Clerk user button — hub header (dark navy bg) ── */
+/* ── Clerk user button — identical markup/classes to every brand
+   dashboard (topbar-user-btn / topbar-user-avatar), base rules copied
+   verbatim from Évolis; only the color override below differs, since
+   the hub's header is dark navy instead of the dashboards' white
+   topbar. The dropdown itself stays inline-styled, same as Évolis. ── */
+.topbar-user-btn{display:flex;align-items:center;gap:8px;background:none;border:1px solid var(--border);border-radius:20px;padding:5px 12px 5px 6px;cursor:pointer;font-family:var(--font);font-size:12px;color:var(--navy);transition:all .13s;}
+.topbar-user-btn:hover{border-color:var(--navy);background:var(--bg);}
+.topbar-user-avatar{width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 #clerk-user{position:relative;}
-.hub-user-btn{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);border-radius:20px;padding:4px 14px 4px 4px;cursor:pointer;font-family:var(--font);font-size:12px;color:#fff;transition:background .15s;}
-.hub-user-btn:hover{background:rgba(255,255,255,0.15);}
-.hub-user-avatar{width:24px;height:24px;border-radius:50%;background:var(--green);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
-.hub-signin-btn{background:var(--green);color:var(--navy);border:none;border-radius:20px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-header);}
-.hub-signin-btn:hover{opacity:.9;}
-#hub-clerk-dropdown{display:none;position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.18);padding:8px;min-width:200px;z-index:1000;}
-#hub-clerk-dropdown.open{display:block;}
-#hub-clerk-dropdown .hcd-info{padding:8px 10px 10px;border-bottom:1px solid var(--border2);margin-bottom:6px;}
-#hub-clerk-dropdown .hcd-name{font-size:12px;font-weight:600;color:var(--navy);}
-#hub-clerk-dropdown .hcd-email{font-size:11px;color:var(--muted);margin-top:2px;}
-#hub-clerk-dropdown button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;background:none;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--navy);font-family:var(--font);text-align:left;}
-#hub-clerk-dropdown button:hover{background:var(--bg);}
+#clerk-user .topbar-user-btn{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);color:#fff;}
+#clerk-user .topbar-user-btn:hover{background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.16);}
+#clerk-user .topbar-user-avatar{background:var(--green);color:var(--navy);}
 
 /* ── Option switcher (demo) ── */
 .option-switcher{background:rgba(0,0,0,0.25);border-bottom:1px solid rgba(255,255,255,0.06);padding:6px 24px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
@@ -246,25 +244,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   </div>
   <div class="hub-header-right">
     <div id="clerk-user"></div>
-    <span class="internal-pill">Internal Only</span>
-  </div>
-</div>
-
-<!-- ══ ACCESS GATE — shown instead of the hub when not signed in as staff ══ -->
-<div class="option-view active" id="hub-gate" style="align-items:center;justify-content:center;text-align:center;padding:60px;">
-  <div style="max-width:420px;">
-    <div style="font-size:32px;margin-bottom:14px;">🔒</div>
-    <div id="hub-gate-title" style="font-family:var(--font-header);font-size:18px;color:var(--navy);margin-bottom:8px;">Checking your session…</div>
-    <div id="hub-gate-sub" style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:20px;">If you're already signed in with your @medaltus.com account, you'll be in shortly.</div>
-    <button class="hub-signin-btn" style="padding:9px 22px;font-size:13px;display:none;" onclick="window.location.href='https://reports.medaltus.com'">Sign In</button>
-    <button class="hub-signin-btn" id="hub-gate-signout-btn" style="padding:9px 22px;font-size:13px;display:none;" onclick="window.Clerk.signOut().then(()=>window.location.href='https://reports.medaltus.com')">Sign Out</button>
+    <span class="internal-pill" id="sb-internal-badge" style="display:none;">Internal Only</span>
   </div>
 </div>
 
 <!-- ══════════════════════════════════════
      OPTION A — Sidebar + Content Area
 ══════════════════════════════════════ -->
-<div class="option-view" id="opt-a">
+<div class="option-view active" id="opt-a">
   <div class="opt-a-body">
 
     <!-- Brand Sidebar -->
@@ -860,118 +847,83 @@ function filterBrands(q) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// CLERK AUTH — hub header user button + full-hub access gate.
+// CLERK AUTH — matches Évolis's pattern exactly, not a page-wide gate.
 //
-// CHANGED — was previously ungated (any signed-in Clerk session could
-// view the whole hub, regardless of who it belonged to). Switched to
-// match Évolis's pattern: gate by EMAIL DOMAIN, not org membership —
-// org membership didn't reliably separate Medaltus staff from clients,
-// same reasoning that drove Évolis's own switch. Unlike Évolis (which
-// gates only one internal-only nav section on an otherwise-public
-// page), the hub is entirely internal, so the WHOLE hub is gated here:
-// anyone signed in with a non-@medaltus.com email — or not signed in
-// at all — sees the restricted-access screen instead of the dashboard.
+// Jaclyn is adding Vercel deployment (password) protection at the
+// account level, so the HTML itself no longer needs to gate access —
+// same division of responsibility as the brand dashboards: Vercel
+// keeps randoms out, Clerk here is just "who's signed in" cosmetics
+// plus the same email-domain check used everywhere else (staff vs.
+// client, since org membership doesn't reliably separate the two).
+// The hub has no internal-only nav section the way Évolis does — the
+// closest equivalent is the "Internal Only" badge, hidden by default
+// and revealed only for a staff email, mirroring sb-internal-badge.
 //
-// This also fixes the "auto-logged-in as jrisser" concern: the header
-// always reflects window.Clerk.user, i.e. whoever's session cookie is
-// actually active in that browser — never a hardcoded account. If two
-// people kept seeing the same name, that's a persisted/shared browser
-// session (someone never signed out on that machine), not something
-// baked into this file. Signing out here now correctly clears that
-// session and returns to the gate screen.
+// If Clerk fails to load, isn't signed in, or the email check fails,
+// the safe fallback is simply "no user button, badge stays hidden" —
+// never a forced sign-in screen or a blocked page.
 // ═══════════════════════════════════════════════════════════════════
 const STAFF_EMAIL_DOMAIN = '@medaltus.com';
-const HUB_SIGN_IN_URL    = 'https://reports.medaltus.com';
-
-function showHubGate(title, sub, showSignIn, showSignOut) {
-  document.querySelectorAll('.option-view').forEach(v => v.classList.remove('active'));
-  document.getElementById('hub-gate').classList.add('active');
-  document.getElementById('hub-gate-title').textContent = title;
-  document.getElementById('hub-gate-sub').textContent = sub;
-  document.querySelector('#hub-gate .hub-signin-btn').style.display = showSignIn ? '' : 'none';
-  document.getElementById('hub-gate-signout-btn').style.display = showSignOut ? '' : 'none';
-}
-
-function showHubContent() {
-  document.querySelectorAll('.option-view').forEach(v => v.classList.remove('active'));
-  document.getElementById('opt-a').classList.add('active');
-}
-
-function renderHubSignedOut() {
-  const el = document.getElementById('clerk-user');
-  if (!el) return;
-  el.innerHTML = `<button class="hub-signin-btn" onclick="window.location.href='${HUB_SIGN_IN_URL}'">Sign In</button>`;
-  showHubGate('Sign in required', 'This hub is internal-only. Sign in with your @medaltus.com account to continue.', true, false);
-}
-
-async function initHubClerkAuth() {
-  const el = document.getElementById('clerk-user');
-
-  function applyHubAuthState(user) {
-    if (!user) { renderHubSignedOut(); return; }
-
-    const firstName = user.firstName || '';
-    const lastName  = user.lastName  || '';
-    const initials  = ((firstName[0] || '') + (lastName[0] || '')).toUpperCase() || '?';
-    const email     = user.primaryEmailAddress?.emailAddress || '';
-    const isStaff   = email.toLowerCase().endsWith(STAFF_EMAIL_DOMAIN);
-
-    el.innerHTML = `
-      <button class="hub-user-btn" id="hub-user-btn">
-        <span class="hub-user-avatar">${initials}</span>
-        <span>${firstName || email}</span>
-      </button>
-      <div id="hub-clerk-dropdown">
-        <div class="hcd-info">
-          <div class="hcd-name">${firstName} ${lastName}</div>
-          <div class="hcd-email">${email}</div>
-        </div>
-        <button id="hub-signout-btn">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M14 8H6"/>
-          </svg>
-          Sign out
-        </button>
-      </div>`;
-
-    document.getElementById('hub-user-btn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      document.getElementById('hub-clerk-dropdown').classList.toggle('open');
-    });
-    document.getElementById('hub-signout-btn').addEventListener('click', () => {
-      window.Clerk.signOut().then(() => window.location.href = HUB_SIGN_IN_URL);
-    });
-    document.addEventListener('click', (e) => {
-      const dd = document.getElementById('hub-clerk-dropdown');
-      if (dd && !el.contains(e.target)) dd.classList.remove('open');
-    });
-
-    if (isStaff) {
-      showHubContent();
-    } else {
-      showHubGate('Restricted to Medaltus staff', `Signed in as ${email}, which isn't a @medaltus.com account. Sign out and sign back in with your Medaltus email to access the hub.`, false, true);
-    }
-  }
-
+const SIGN_IN_URL        = 'https://reports.medaltus.com';
+window.addEventListener('load', async () => {
   try {
-    if (!window.Clerk) { renderHubSignedOut(); return; }
+    if (!window.Clerk) return; // Clerk script failed to load — stay on safe default
     await window.Clerk.load();
-    // Satellite-domain sessions (this hub, syncing off the primary
-    // reports.medaltus.com Clerk session) can finish syncing a moment
-    // AFTER load() resolves — so a single snapshot of Clerk.user right
-    // here can read null even when you're genuinely already signed in
-    // elsewhere on medaltus.com, which was forcing an unnecessary
-    // sign-in page. Listening for updates instead means the hub
-    // recognizes that existing session as soon as it finishes syncing,
-    // with no re-login required.
-    window.Clerk.addListener(({ user }) => applyHubAuthState(user));
-    applyHubAuthState(window.Clerk.user);
+    const user = window.Clerk.user;
+    if (!user) return; // not signed in — safe default (badge hidden)
+    const email = user.primaryEmailAddress?.emailAddress || '';
+    const isStaff = email.toLowerCase().endsWith(STAFF_EMAIL_DOMAIN);
+    if (isStaff) {
+      const internalBadge = document.getElementById('sb-internal-badge');
+      if (internalBadge) internalBadge.style.display = '';
+    }
+    // Render the user button (sign-out) regardless of staff/client status —
+    // anyone signed in should be able to see who they are and sign out.
+    const userEl = document.getElementById('clerk-user');
+    if (userEl) {
+      // Build a simple user button with sign-out
+      const firstName = user.firstName || '';
+      const lastName  = user.lastName  || '';
+      const initials  = ((firstName[0] || '') + (lastName[0] || '')).toUpperCase() || '?';
+      const email     = user.primaryEmailAddress?.emailAddress || '';
+      userEl.innerHTML = `
+        <div style="position:relative;">
+          <button class="topbar-user-btn" onclick="document.getElementById('clerk-dropdown').classList.toggle('open')">
+            <span class="topbar-user-avatar">${initials}</span>
+            <span>${firstName || email}</span>
+          </button>
+          <div id="clerk-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,31,96,.10);padding:8px;min-width:180px;z-index:1000;">
+            <div style="padding:8px 10px 10px;border-bottom:1px solid var(--border2);margin-bottom:6px;">
+              <div style="font-size:12px;font-weight:600;color:var(--navy);">${firstName} ${lastName}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">${email}</div>
+            </div>
+            <button onclick="window.Clerk.signOut().then(()=>window.location.href='${SIGN_IN_URL}')"
+              style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;background:none;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--navy);font-family:var(--font);text-align:left;"
+              onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M14 8H6"/>
+              </svg>
+              Sign out
+            </button>
+          </div>
+        </div>`;
+      // Close dropdown on outside click
+      document.addEventListener('click', e => {
+        const dd = document.getElementById('clerk-dropdown');
+        if (dd && !userEl.contains(e.target)) dd.style.display = 'none';
+      });
+      document.getElementById('clerk-dropdown').addEventListener('click', () => {});
+      // Toggle display properly
+      userEl.querySelector('.topbar-user-btn').addEventListener('click', () => {
+        const dd = document.getElementById('clerk-dropdown');
+        dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+      });
+      userEl.querySelector('.topbar-user-btn').setAttribute('onclick', '');
+    }
   } catch (err) {
-    console.warn('[Clerk] Hub auth check failed:', err);
-    renderHubSignedOut();
+    console.warn('[Clerk] Auth check failed, badge stays hidden:', err);
   }
-}
-window.addEventListener('load', initHubClerkAuth);
+});
 </script>
 </body>
 </html>
