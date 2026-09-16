@@ -254,9 +254,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 <div class="option-view active" id="hub-gate" style="align-items:center;justify-content:center;text-align:center;padding:60px;">
   <div style="max-width:420px;">
     <div style="font-size:32px;margin-bottom:14px;">🔒</div>
-    <div id="hub-gate-title" style="font-family:var(--font-header);font-size:18px;color:var(--navy);margin-bottom:8px;">Sign in required</div>
-    <div id="hub-gate-sub" style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:20px;">This hub is internal-only. Sign in with your @medaltus.com account to continue.</div>
-    <button class="hub-signin-btn" style="padding:9px 22px;font-size:13px;" onclick="window.location.href='https://reports.medaltus.com'">Sign In</button>
+    <div id="hub-gate-title" style="font-family:var(--font-header);font-size:18px;color:var(--navy);margin-bottom:8px;">Checking your session…</div>
+    <div id="hub-gate-sub" style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:20px;">If you're already signed in with your @medaltus.com account, you'll be in shortly.</div>
+    <button class="hub-signin-btn" style="padding:9px 22px;font-size:13px;display:none;" onclick="window.location.href='https://reports.medaltus.com'">Sign In</button>
     <button class="hub-signin-btn" id="hub-gate-signout-btn" style="padding:9px 22px;font-size:13px;display:none;" onclick="window.Clerk.signOut().then(()=>window.location.href='https://reports.medaltus.com')">Sign Out</button>
   </div>
 </div>
@@ -906,10 +906,8 @@ function renderHubSignedOut() {
 
 async function initHubClerkAuth() {
   const el = document.getElementById('clerk-user');
-  try {
-    if (!window.Clerk) { renderHubSignedOut(); return; }
-    await window.Clerk.load();
-    const user = window.Clerk.user;
+
+  function applyHubAuthState(user) {
     if (!user) { renderHubSignedOut(); return; }
 
     const firstName = user.firstName || '';
@@ -953,6 +951,21 @@ async function initHubClerkAuth() {
     } else {
       showHubGate('Restricted to Medaltus staff', `Signed in as ${email}, which isn't a @medaltus.com account. Sign out and sign back in with your Medaltus email to access the hub.`, false, true);
     }
+  }
+
+  try {
+    if (!window.Clerk) { renderHubSignedOut(); return; }
+    await window.Clerk.load();
+    // Satellite-domain sessions (this hub, syncing off the primary
+    // reports.medaltus.com Clerk session) can finish syncing a moment
+    // AFTER load() resolves — so a single snapshot of Clerk.user right
+    // here can read null even when you're genuinely already signed in
+    // elsewhere on medaltus.com, which was forcing an unnecessary
+    // sign-in page. Listening for updates instead means the hub
+    // recognizes that existing session as soon as it finishes syncing,
+    // with no re-login required.
+    window.Clerk.addListener(({ user }) => applyHubAuthState(user));
+    applyHubAuthState(window.Clerk.user);
   } catch (err) {
     console.warn('[Clerk] Hub auth check failed:', err);
     renderHubSignedOut();
