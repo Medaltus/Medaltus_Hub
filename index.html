@@ -11,6 +11,10 @@
   data-clerk-publishable-key="pk_live_Y2xlcmsucmVwb3J0cy5tZWRhbHR1cy5jb20k"
   src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
   type="text/javascript"></script>
+<!-- Chart.js — used by brand Summary tabs that render live KPIs/charts
+     ported from that brand's own internal Overview page (Évolis first;
+     same pattern used for future brands). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
   --navy:#001F60; --slate:#6B7BA2; --green:#24E9A3; --sand:#F4DFD0; --silver:#CCD3D5;
@@ -226,6 +230,57 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .bs-title{font-size:14px;font-weight:500;color:var(--navy);}
 .bs-sub{font-size:12px;color:var(--muted);line-height:1.7;max-width:340px;}
 .bs-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(200,125,47,0.10);border:1px solid rgba(200,125,47,0.20);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:600;color:var(--warn);margin-top:4px;}
+
+/* ══════════════════════════════════════════════════════════════════
+   BRAND OVERVIEW / SUMMARY — ported verbatim from Évolis's own
+   internal Overview page CSS, so its ported HTML+JS render correctly
+   here unmodified. Same brand color tokens already match (--navy,
+   --green, --slate, --sand, --white, --bg, --bg2, --border, --muted),
+   so no renaming was needed — these class names didn't already exist
+   in the hub. --font-subheader is added as a fallback stack (Évolis's
+   real Plantin MT Pro Italic font file isn't available here).
+   ══════════════════════════════════════════════════════════════════ */
+:root{ --font-subheader:'Georgia','Times New Roman',serif; }
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:22px;}
+.kpi-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:20px 20px;min-height:116px;height:auto;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-start;}
+.kpi-card.kpi-card-tall{min-height:148px;height:auto;}
+.kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px;}
+.kpi-value{font-size:30px;font-weight:600;letter-spacing:-1px;line-height:1;color:var(--navy);font-family:var(--font-subheader);}
+.kpi-value.sm{font-size:30px;}
+.kpi-mom{font-size:14px;margin-top:5px;}
+.kpi-mom.up{color:#1db88a;}
+.kpi-mom.dn{color:var(--danger);}
+.kpi-mom.flat{color:var(--muted);}
+.period-pill{border:none;background:transparent;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--slate);cursor:pointer;font-family:var(--font);transition:all .15s;white-space:nowrap;}
+.period-pill:hover{color:var(--navy);}
+.period-pill.active{background:var(--navy);color:#fff;}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.card+.card{margin-top:14px;}
+.card-title{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:14px;font-family:var(--font-subheader);}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.brand-hero{background:linear-gradient(135deg,var(--navy) 0%,#0a2a78 100%);border-radius:var(--radius);padding:24px 28px;margin-bottom:22px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.brand-hero-left .brand-name{font-size:22px;font-weight:600;color:#fff;letter-spacing:-.4px;}
+.brand-hero-left .brand-tagline{font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px;}
+.brand-hero-right{display:flex;gap:20px;}
+.hero-stat{text-align:center;}
+.hero-stat-val{font-size:28px;font-weight:700;color:var(--green);line-height:1;font-family:var(--font-subheader);}
+.hero-stat-lbl{font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;}
+.sheet-link-menu{position:relative;display:inline-block;margin-bottom:14px;}
+.sheet-link-btn{display:inline-flex;align-items:center;gap:6px;background:var(--white);border:1px solid var(--border);border-radius:999px;padding:7px 14px;font-size:11.5px;font-weight:600;color:var(--navy);cursor:pointer;font-family:var(--font);transition:all .13s;}
+.sheet-link-btn:hover{background:var(--bg2);border-color:var(--slate);}
+.sheet-link-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,31,96,.14);min-width:260px;z-index:50;padding:6px;max-height:360px;overflow-y:auto;}
+.sheet-link-dropdown.open{display:block;}
+.sheet-link-dropdown a{display:block;padding:8px 12px;border-radius:6px;font-size:12px;color:var(--navy);text-decoration:none;transition:background .1s;}
+.sheet-link-dropdown a:hover{background:var(--bg2);}
+.sheet-link-dropdown a span.sheet-link-icon{margin-right:6px;}
+.ppc-note{font-size:11.5px;color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--border2);line-height:1.65;}
+table.data-table{width:100%;border-collapse:collapse;}
+table.data-table thead tr{background:var(--navy);}
+table.data-table thead th{padding:8px 12px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--white);text-align:left;}
+table.data-table tbody tr{border-bottom:1px solid var(--border2);}
+table.data-table tbody tr:nth-child(odd){background:var(--bg);}
+table.data-table tbody tr:last-child{border-bottom:none;}
+table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font-weight:600;}
 </style>
 </head>
 <body>
@@ -439,26 +494,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
             <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://evolis.medaltus.com/','_blank')">↗ New Tab</button>
           </div>
         </div>
-        <div class="b-cards-scroll" id="b-evolis-cards">
-          <div class="kpi-strip">
-            <div class="ks-card"><div class="ks-lbl">Total Units</div><div class="ks-val">387</div><div class="ks-mom dn">▼ 6% MOM</div></div>
-            <div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$17.5K</div><div class="ks-mom dn">▼ 4% MOM</div></div>
-            <div class="ks-card"><div class="ks-lbl">Blended AOV</div><div class="ks-val sm">$45.20</div><div class="ks-mom up">▲ 2% MOM</div></div>
-            <div class="ks-card"><div class="ks-lbl">Ad Spend</div><div class="ks-val sm">$1,240</div><div class="ks-mom fl">0% MOM</div></div>
-            <div class="ks-card"><div class="ks-lbl">Blended ACOS</div><div class="ks-val sm">8.4%</div><div class="ks-mom dn">▲ 1.2pp</div></div>
-          </div>
-          <div class="ch-strip">
-            <div class="ch-card"><div class="ch-name">Amazon</div><div class="ch-val">263 units</div><div class="ch-sub">$9.6K · 68% share</div><div class="ch-bar"><div class="ch-fill" style="width:68%"></div></div></div>
-            <div class="ch-card"><div class="ch-name">Website</div><div class="ch-val">86 units</div><div class="ch-sub">$3.8K · 22% share</div><div class="ch-bar"><div class="ch-fill green" style="width:22%"></div></div></div>
-            <div class="ch-card"><div class="ch-name">Walmart</div><div class="ch-val">38 units</div><div class="ch-sub">$1.8K · 10% share</div><div class="ch-bar"><div class="ch-fill slate" style="width:10%"></div></div></div>
-          </div>
-          <div class="flags-card">
-            <div class="flags-title">Flags & Alerts</div>
-            <div class="flag-row"><div class="flag-dot w"></div><div class="flag-text">Amazon organic units down 6% MOM — monitor for 2nd consecutive month</div><span class="flag-tag">Sales</span></div>
-            <div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Website subscription rate 18% — new high, trend intact</div><span class="flag-tag">Website</span></div>
-            <div class="flag-row"><div class="flag-dot w"></div><div class="flag-text">1 insight pending leadership approval before going live</div><span class="flag-tag">Insights</span></div>
-          </div>
-        </div>
+        <div class="b-cards-scroll" id="b-evolis-cards"></div>
         <div class="b-iframe-panel" id="b-evolis-dash">
           <iframe src="https://evolis.medaltus.com/" title="Évolis — Full Internal Dashboard"></iframe>
         </div>
@@ -641,7 +677,1565 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 
 </div><!-- /shell -->
 <script>
+(function () {
+  'use strict';
+
+  // These 8 constants live at top-level scope in Évolis's real dashboard
+  // file (outside this IIFE, shared with other pages like Marketing >
+  // Fulfillment & CS and PPC). Inlined here since the hub only ports this
+  // one self-contained Overview module, not the rest of that file.
+  const OV_BUSINESS_REPORT_SHEET_ID = '1Jkx7Ztnt59eniYtvTnpXB8D7xMnCyjC8b49xB4J59ww';
+  const OV_BUSINESS_REPORT_GID      = '310979287';  // evolis tab — one row per ASIN per month
+  const OV_RETURNS_SHEET_ID = '16mnFaFkTfXS4FzZ2mI5aoDKNrw8FWe8R8IUDnv3FHVs';
+  const OV_RETURNS_EVOLIS_GID = '267551179';
+  const OV_WEB_ORDERS_SHEET_ID = '1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw';
+  const OV_WEB_RETURNS_GID     = '1033366681'; // same spreadsheet as web orders, different tab
+  const OV_WMT_RETURNS_SHEET_ID = '1XxYmX0NT-4bqKh4N96zNAPIAzctXDQaK6Yzp6hVWjJc';
+  const OV_WMT_RETURNS_GID      = '344983459';
+
+
+  function sheetCsvUrl(id, gid) { return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`; }
+  function isCsv(t) { t = (t || '').trim(); return t.length > 0 && !t.startsWith('<') && !t.startsWith('{'); }
+  function parseCsvLine(line) {
+    const result = []; let cur = '', inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQuote = !inQuote; }
+      else if (c === ',' && !inQuote) { result.push(cur); cur = ''; }
+      else { cur += c; }
+    }
+    result.push(cur);
+    return result;
+  }
+  function parseCsv(text) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return [];
+    const headers = parseCsvLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
+    return lines.slice(1).map(line => {
+      const vals = parseCsvLine(line);
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (vals[i] || '').replace(/^"|"$/g, '').trim(); });
+      return obj;
+    });
+  }
+  function normalizeDate(val) {
+    if (!val) return '';
+    if (/^\d{4}-\d{2}/.test(val)) return val.substring(0, 10);
+    const parts = val.split('/');
+    if (parts.length === 3) {
+      const m = parts[0].padStart(2, '0'), d = parts[1].padStart(2, '0');
+      const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    return val;
+  }
+  function parseAmt(v) { if (!v) return 0; return parseFloat(String(v).replace(/[$,]/g, '')) || 0; }
+  function fmtDateStr(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function pctChange(curr, prevVal) { if (!prevVal) return null; return Math.round(((curr - prevVal) / prevVal) * 100); }
+
+  function isEvolisRow(row) {
+    const brand = (row.brand || '').toLowerCase().trim();
+    const skus = (row.sku || row.skus || '').toUpperCase();
+    return brand === 'evolis' || brand.endsWith('volis') || skus.split(',').some(s => s.trim().startsWith('EVO'));
+  }
+  function isValidAmazonRow(row) {
+    const status = (row.status || '').toLowerCase().trim();
+    if (status === 'cancelled' || status === 'pending') return false;
+    if ((row.promotion_ids || '').toLowerCase().includes('vine')) return false;
+    return true;
+  }
+  function isValidWebRow(row) {
+    const status = (row.financial_status || row.status || '').toLowerCase();
+    return status !== 'refunded' && status !== 'cancelled' && status !== 'canceled' && status !== 'voided';
+  }
+  function isValidWalmartRow(row) {
+    const status = (row.status || '').toLowerCase().trim();
+    return status !== 'cancelled' && status !== 'canceled';
+  }
+
+  // Aggregates rows whose (normalized) date falls within an inclusive
+  // [startStr, endStr] range \u2014 this is the piece that lets us do true
+  // month-to-date instead of only ever whole calendar months.
+  // FIXED 2026-08-25 — added useOrderTotal (opt-in, defaults to false),
+  // same reasoning as pbAggregateOrders above on the PPC page: Amazon and
+  // Walmart have no order_total column, so their calls are unaffected;
+  // Website's order_total repeats the real whole-order total on every
+  // line-item row (confirmed against sync-shopify-orders.js), so it
+  // should be SET once per order_id, not summed via item_price across
+  // an order's line items.
+  function aggregateRange(rows, startStr, endStr, validFn, useOrderTotal) {
+    const filtered = rows.filter(r => {
+      const d = normalizeDate(r.date);
+      return d && d >= startStr && d <= endStr && validFn(r);
+    });
+    const orderIds = new Set(filtered.map(r => r.order_id).filter(Boolean));
+    const totalOrders = orderIds.size;
+    const totalUnits = filtered.reduce((s, r) => s + (parseInt(r.unit_count, 10) || 0), 0);
+    const orderTotals = {};
+    filtered.forEach(r => {
+      if (!r.order_id) return;
+      if (useOrderTotal) {
+        orderTotals[r.order_id] = parseAmt(r.order_total);
+      } else {
+        orderTotals[r.order_id] = (orderTotals[r.order_id] || 0) + parseAmt(r.item_price);
+      }
+    });
+    const totalRevenue = Object.values(orderTotals).reduce((s, v) => s + v, 0);
+    const skuSet = new Set(filtered.map(r => (r.sku || '').trim()).filter(Boolean));
+    return { totalUnits, totalOrders, totalRevenue, skuSet, filteredRows: filtered };
+  }
+
+  // Sums unit_count per SKU (stripping the -SF seller-fulfilled suffix so
+  // FBA and SF variants of the same product merge into one row — same
+  // convention used everywhere else in this dashboard).
+  //
+  // Keyed by ASIN, not SKU — per this project's own convention (each
+  // product has an FBA SKU and a separate "-SF" seller-fulfilled SKU;
+  // grouping by SKU alone silently splits a single product into two rows
+  // and undercounts seller-fulfilled sales). ASIN is the same across both
+  // fulfillment types, so it's the safe key here.
+  //
+  // Website/Walmart order rows only ever carry a SKU, never an ASIN. When
+  // that's the case, skuToAsinMap (built from the same product-names sheet,
+  // col B SKU → col A ASIN) resolves it to the real ASIN so it groups with
+  // Amazon's data for the same product instead of becoming its own
+  // separate, unnamed row. Falls back to the raw SKU only if the crosswalk
+  // has no entry for it either.
+  function unitsByAsin(filteredRows, skuToAsinMap) {
+    const map = {};
+    filteredRows.forEach(r => {
+      let key = (r.asin || '').trim().toUpperCase();
+      if (!key) {
+        const sku = (r.sku || '').trim().toUpperCase().replace(/-SF$/i, '');
+        key = (skuToAsinMap && skuToAsinMap[sku]) || sku;
+      }
+      if (!key) return;
+      map[key] = (map[key] || 0) + (parseInt(r.unit_count, 10) || 0);
+    });
+    return map;
+  }
+
+  // ADDED 2026-08-28 per Jaclyn/Skinuva changelog — this assumed "number
+  // went up = green" for every KPI, which is wrong for ACOS (lower is
+  // better). Confirmed the same bug existed here: ACOS was showing green
+  // when it got worse. invert defaults to false/undefined so every OTHER
+  // existing call site (which doesn't pass it) keeps its current,
+  // correct "up = green" behavior — only ov-kpi-acos's call site below
+  // passes invert: true.
+  function setKpi(cardId, value, pctVal, suffix, invert) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const valEl = card.querySelector('.kpi-value');
+    const momEl = card.querySelector('.kpi-mom');
+    if (valEl) valEl.textContent = value;
+    if (momEl) {
+      if (pctVal == null) { momEl.className = 'kpi-mom flat'; momEl.textContent = '\u2014'; return; }
+      const isGoodDirection = invert ? pctVal < 0 : pctVal > 0;
+      const cls = pctVal === 0 ? 'flat' : isGoodDirection ? 'up' : 'dn';
+      const arrow = pctVal === 0 ? '' : pctVal > 0 ? '\u25b2 ' : '\u25bc ';
+      momEl.className = 'kpi-mom ' + cls;
+      momEl.textContent = `${arrow}${Math.abs(pctVal)}%${suffix || ' vs MTD last month'}`;
+    }
+  }
+
+  // For KPIs with no reliable day-level source to build a true MTD-vs-MTD
+  // comparison from (e.g. the ad orders sheet buckets by month only, no
+  // date field) — shows a plain static label instead of a misleading
+  // percentage. Per Jaclyn 2026-07-24: drop the MOM badge rather than
+  // fake a comparison the underlying data can't actually support.
+  function setKpiPlain(cardId, value, label) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const valEl = card.querySelector('.kpi-value');
+    const momEl = card.querySelector('.kpi-mom');
+    if (valEl) valEl.textContent = value;
+    if (momEl) { momEl.className = 'kpi-mom flat'; momEl.textContent = label || ''; }
+  }
+
+  // ADDED 2026-08-28 — ported from Skinuva's proven MTD/Last Month toggle
+  // architecture (real, working code, not rebuilt from a description).
+  // Re-runs the fetch+compute pipeline with the selected period's cfg
+  // each time, rather than pre-computing both periods upfront.
+  const OV_PERIOD_LABELS = { mtd: 'Month to Date', lastFull: 'Last Month' };
+
+  function getOverviewPeriodConfig(key) {
+    if (key === 'lastFull') {
+      // FIXED 2026-09-01 — was calling getLastFullMonth(), which doesn't
+      // exist in this scope (it's declared locally inside several OTHER,
+      // separate IIFEs elsewhere in this file — Amazon/Website/Walmart
+      // Sales pages each have their own copy — none of which this
+      // function has access to). That threw a silent ReferenceError on
+      // every "Last Month" click, which the surrounding init function's
+      // try/catch swallowed — so the page never actually recomputed
+      // anything and just stayed frozen on whatever MTD last showed.
+      // Confirmed live via console: clicking the toggle logged the
+      // ReferenceError every time. Inlined here instead, same pattern
+      // every other scope in this file already uses for this exact
+      // calculation rather than relying on cross-scope access.
+      const nowForLF = new Date();
+      let year = nowForLF.getFullYear();
+      let month = nowForLF.getMonth(); // 0-indexed, so this IS last month's 1-indexed value
+      if (month === 0) { month = 12; year--; }
+      let prevMonth = month - 1, prevYear = year;
+      if (prevMonth === 0) { prevMonth = 12; prevYear--; }
+      return {
+        key: 'lastFull', label: OV_PERIOD_LABELS.lastFull, isPartial: false,
+        year, month, day: new Date(year, month, 0).getDate(),
+        prevYear, prevMonth, prevDay: new Date(prevYear, prevMonth, 0).getDate(),
+      };
+    }
+    const now = new Date();
+    const year = now.getFullYear(), month = now.getMonth() + 1, day = now.getDate();
+    let prevMonth = month - 1, prevYear = year;
+    if (prevMonth === 0) { prevMonth = 12; prevYear--; }
+    return { key: 'mtd', label: OV_PERIOD_LABELS.mtd, isPartial: true, year, month, day, prevYear, prevMonth, prevDay: day };
+  }
+
+  function renderOverviewPeriodPills() {
+    const el = document.getElementById('ov-period-pills');
+    if (!el) return;
+    el.innerHTML = Object.entries(OV_PERIOD_LABELS).map(([key, label]) =>
+      `<button class="period-pill${key === window._overviewActivePeriod ? ' active' : ''}" onclick="window.__overviewSelectPeriod('${key}')">${label}</button>`
+    ).join('');
+  }
+  window.__overviewSelectPeriod = function (key) {
+    window._overviewActivePeriod = key;
+    renderOverviewPeriodPills();
+    window.initOverviewLive(key);
+  };
+
+  window.initOverviewLive = async function (periodKey) {
+    const activeKey = periodKey || window._overviewActivePeriod || 'mtd';
+    window._overviewActivePeriod = activeKey;
+    renderOverviewPeriodPills();
+    if (window._overviewLiveInit === activeKey) return;
+    window._overviewLiveInit = activeKey;
+    console.log('[Evolis] initOverviewLive() called \u2014 period:', activeKey);
+
+    const cfg = getOverviewPeriodConfig(activeKey);
+
+    const AMAZON_SHEET_ID = '1SiYu8e2-Pfi14Aiuf6SAFytWVXb4_dtdNFT6wvLFPok'; const AMAZON_GID = '1163928587';
+    const WEB_SHEET_ID    = '1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw'; const WEB_GID    = '597852778';
+    const WMT_SHEET_ID    = '1oIZDxN0vSf4nRvE_K95lsNyBWQd4Ef2aARm0RUtvE0Y'; const WMT_GID    = '1844526926';
+    const AD_ORDERS_SHEET_ID = '1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI'; const AD_ORDERS_GID = '158578426';
+    // Added 2026-08-06 per Jaclyn — Walmart's ad data sheets.
+    const WALMART_AD_ORDERS_SHEET_ID   = '1PYUPePnhnBJp77n3HVSKeM824ZorAMkiJC8WFbyORCU'; const WALMART_AD_ORDERS_GID   = '664808652'; // evolis tab
+    const WALMART_ADVERTISING_SHEET_ID = '1H1mAYxu8udO7vuCPGs8u0iVzHaRh0wbHb4PyIka4pUU'; const WALMART_ADVERTISING_GID = '844750080'; // evolis tab
+    const AMZ_REVENUE_SHEET_ID = '1equxdiqpzonA5TgsrKzbrpq92QHyJP8kQ2RoUiYmank'; const AMZ_REVENUE_GID = '1237377804';
+    const WEB_REVENUE_GID = '7000599';
+    const WMT_REVENUE_SHEET_ID = '1QhKeOxKR0mEfSiM2pdYxrEBWsQdRSxbL8Q86MP6lpFE'; const WMT_REVENUE_GID = '812984298';
+    // Website (Google) ads data — same workbook as Website orders/returns.
+    // "ads" tab (campaign-level daily) and "shopping" tab (SKU-level, PMAX
+    // campaigns only). Added 2026-08-05 per Jaclyn.
+    const WEB_ADS_GID = '219707263';
+    const WEB_SHOPPING_GID = '1841786277';
+    // FIXED 2026-09-11 per Jaclyn — confirmed live via console:
+    // "ReferenceError: AD_SUMMARY_SHEET_ID is not defined". This exact
+    // constant already exists twice elsewhere in this file, but both are
+    // scoped inside OTHER, separate functions (Amazon/Website Sales
+    // pages), and a third copy sits in an entirely different <script>
+    // block altogether — none of which this function can reach. Same
+    // mistake, same fix, as the earlier getLastFullMonth incident:
+    // declared locally here instead of assuming cross-scope access.
+    const AD_SUMMARY_SHEET_ID = '13cN301QZxkEGy6-8LfdzB8zmsHhUKwZqz6lsXKUJcnI'; // advertising cache
+    const AD_SUMMARY_GID      = '2032256212';                                     // Évolis tab
+
+    // `now` stays literal wall-clock "today" — still needed below for
+    // things that are genuinely period-independent (the trailing-6-months
+    // revenue trend chart, cache-busting timestamps, Pending Orders — kept
+    // always-current regardless of the toggle per Jaclyn's explicit call).
+    // Everything that means "the month we're computing this page for" now
+    // reads from `cfg` instead, so it moves with the period toggle.
+    const now = new Date();
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const daysElapsed = cfg.day;
+    const mtdStartStr = fmtDateStr(new Date(cfg.year, cfg.month - 1, 1));
+    const mtdEndStr   = fmtDateStr(new Date(cfg.year, cfg.month - 1, cfg.day));
+    const prevStartStr = fmtDateStr(new Date(cfg.prevYear, cfg.prevMonth - 1, 1));
+    const prevEndStr   = fmtDateStr(new Date(cfg.prevYear, cfg.prevMonth - 1, cfg.prevDay));
+    // Reference year/month used by sheets matched on exact (year, month)
+    // integers rather than a date-string range (ad-driven units, per-ASIN
+    // ad units, Walmart ad spend) — these used to read `now`/hardcoded
+    // last-month directly; now they read the selected period's own cfg.
+    const refYear = cfg.year, refMonth = cfg.month;
+    const lastMonthYear = cfg.prevYear, lastMonthNum = cfg.prevMonth;
+
+    // Swap the 4 "MTD ..." KPI card labels for a period-neutral label when
+    // viewing a completed month, and build the shared MOM-suffix strings
+    // used by the setKpi() calls below (was hardcoded ' vs MTD last month
+    // (Est.)' everywhere — only correct for the mtd period).
+    const OV_KPI_LABELS = {
+      'ov-kpi-organic-orders': cfg.isPartial ? 'MTD Organic Units' : 'Organic Units',
+      'ov-kpi-organic-sales':  cfg.isPartial ? 'MTD Organic Sales' : 'Organic Sales',
+      'ov-kpi-ad-orders':      cfg.isPartial ? 'MTD Ad-Driven Units' : 'Ad-Driven Units',
+      'ov-kpi-ad-sales':       cfg.isPartial ? 'MTD Ad Sales' : 'Ad Sales',
+    };
+    Object.entries(OV_KPI_LABELS).forEach(([id, text]) => {
+      const card = document.getElementById(id);
+      const lblEl = card && card.querySelector('.kpi-label');
+      if (lblEl) lblEl.textContent = text;
+    });
+    const ovMomSuffix = cfg.isPartial ? ' vs MTD last month (Est.)' : ' vs prior month';
+    const ovMomSuffixReal = cfg.isPartial ? ' vs MTD last month' : ' vs prior month';
+    const heroRevLblEl = document.getElementById('ov-hero-revenue-lbl');
+    if (heroRevLblEl) heroRevLblEl.textContent = cfg.isPartial ? 'Month-to-Date Revenue' : 'Last Month\u2019s Revenue';
+
+    const titleEl = document.getElementById('ov-donut-title');
+    if (titleEl) titleEl.textContent = `Revenue by Channel \u2014 ${monthNames[cfg.month - 1]} ${cfg.year}${cfg.isPartial ? ' MTD' : ''}`;
+
+    try {
+      // Added 2026-08-03 per Jaclyn: net MTD revenue/units against actual
+      // returns rather than only gross order data. Returns sheets are
+      // fetched alongside the existing 4 — OV_RETURNS_SHEET_ID /
+      // OV_WMT_RETURNS_SHEET_ID / OV_WEB_ORDERS_SHEET_ID + their gids are
+      // already declared globally further down this file (used by the
+      // existing "Returns Processed" KPI on Marketing → Fulfillment & CS),
+      // reused here rather than redeclared.
+      const [amzCsv, webCsv, wmtCsv, adOrdersCsv, amzReturnsCsv, wmtReturnsCsv, webReturnsCsv, namesCsv, webAdsCsv, webShoppingCsv, bizCsv, adSummaryCsv] = await Promise.all([
+        fetch(sheetCsvUrl(AMAZON_SHEET_ID, AMAZON_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(WEB_SHEET_ID, WEB_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(WMT_SHEET_ID, WMT_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(AD_ORDERS_SHEET_ID, AD_ORDERS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(ovCsvUrl(OV_RETURNS_SHEET_ID, OV_RETURNS_EVOLIS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(ovCsvUrl(OV_WMT_RETURNS_SHEET_ID, OV_WMT_RETURNS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(ovCsvUrl(OV_WEB_ORDERS_SHEET_ID, OV_WEB_RETURNS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Product names + SKU→ASIN crosswalk — col A = ASIN, col B = SKU (base,
+        // no -SF), col C = Name. Moved into this parallel batch 2026-08-05 (was
+        // previously fetched later, after returns netting had already run) so
+        // skuToAsinMap exists in time to resolve Website/Walmart RETURN rows
+        // (which only ever carry a SKU, never an ASIN) to the same ASIN key
+        // used everywhere else on this page.
+        fetch(sheetCsvUrl('1NNRTRQxQl2r4XivAvH700CC39p49GD2xfZlyRNqahGA', '164358627') + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Website (Google Ads) spend/orders — added 2026-08-05 per Jaclyn.
+        // Same workbook as Website orders/returns (OV_WEB_ORDERS_SHEET_ID),
+        // "ads" tab: date, campaign_name, impressions, clicks, spend,
+        // conversions, revenue, acos, last_updated. Real day-level data
+        // (unlike Amazon's month-bucketed ad_orders sheet), so this needs no
+        // proration — a true MTD sum is possible directly.
+        fetch(sheetCsvUrl(OV_WEB_ORDERS_SHEET_ID, WEB_ADS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // Website (Google Shopping/PMAX) orders by SKU — "shopping" tab: date,
+        // item_id, product_title, impressions, clicks, spend, conversions,
+        // conversions_value, acos, last_updated, SKU. Per Jaclyn: PMAX is the
+        // only Google campaign type with SKU-level data, so it's the best
+        // available source for per-ASIN Website ad units (not a full picture
+        // of every Google campaign type).
+        fetch(sheetCsvUrl(OV_WEB_ORDERS_SHEET_ID, WEB_SHOPPING_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // ADDED 2026-09-04 per Jaclyn — Business Report, for the Conv%
+        // column on Top Selling Products. Amazon-only source (this sheet
+        // has no Website/Walmart sessions equivalent), same sheet/gid
+        // already confirmed and used elsewhere on this dashboard (PPC
+        // Blended Context, Brand Momentum).
+        fetch(ovCsvUrl(OV_BUSINESS_REPORT_SHEET_ID, OV_BUSINESS_REPORT_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        // ADDED 2026-09-11 per Jaclyn — Advertising Cache, for the new Ad
+        // Spend by Type (SP/SB/SD) chart. Same sheet/gid already
+        // confirmed and used elsewhere on this dashboard (PPC Blended
+        // Context's Ad Spend/ACOS). Real column names confirmed directly
+        // from the actual file, not assumed: sp_spend, sb_spend,
+        // sd_spend (plus matching _sales/_ad_units/_acos variants, not
+        // needed for this specific chart).
+        fetch(sheetCsvUrl(AD_SUMMARY_SHEET_ID, AD_SUMMARY_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+      ]);
+      const bizRows = parseCsvToRows(bizCsv);
+
+      const amzRows = isCsv(amzCsv) ? parseCsv(amzCsv).filter(isEvolisRow) : [];
+      const webRows = isCsv(webCsv) ? parseCsv(webCsv) : [];
+      const wmtRows = isCsv(wmtCsv) ? parseCsv(wmtCsv) : [];
+      console.log('[Evolis][overview] row counts \u2014 amazon:', amzRows.length, 'web:', webRows.length, 'walmart:', wmtRows.length, '\u2014 MTD range:', mtdStartStr, 'to', mtdEndStr);
+
+      // Product names + SKU→ASIN crosswalk (see fetch comment above).
+      let asinNameMap = {};
+      let skuToAsinMap = {};
+      let walmartItemIdToAsinMap = {}; // added 2026-08-06 per Jaclyn, for Walmart ad-units below
+      try {
+        if (isCsv(namesCsv)) {
+          const lines = namesCsv.trim().split('\n');
+          for (let i = 1; i < lines.length; i++) {
+            const cols = parseCsvLine(lines[i]);
+            const asin = (cols[0] || '').replace(/^"|"$/g, '').trim().toUpperCase();
+            const sku = (cols[1] || '').replace(/^"|"$/g, '').trim().toUpperCase().replace(/-SF$/i, '');
+            const name = (cols[2] || '').replace(/^"|"$/g, '').trim();
+            const walmartItemId = (cols[8] || '').replace(/^"|"$/g, '').trim();
+            if (asin && name) asinNameMap[asin] = name;
+            if (sku && asin) skuToAsinMap[sku] = asin;
+            if (walmartItemId && asin) walmartItemIdToAsinMap[walmartItemId] = asin;
+          }
+          console.log('[Evolis][overview] product name lookup: ', Object.keys(asinNameMap).length, 'ASINs,', Object.keys(skuToAsinMap).length, 'SKU→ASIN mappings,', Object.keys(walmartItemIdToAsinMap).length, 'Walmart Item ID→ASIN mappings');
+        }
+      } catch (e) { console.warn('[Evolis][overview] product name lookup failed:', e.message); }
+
+      // Average Amazon item_price per ASIN, built from the Amazon Orders sheet
+      // rows already fetched above. Added 2026-08-05 per Jaclyn: Amazon's
+      // Returns report (OV_RETURNS_SHEET_ID) has NO dollar field at all —
+      // confirmed columns are return_date, order_id, sku, asin, fnsku,
+      // product_name, quantity, fulfillment_center_id, detailed_disposition,
+      // reason, status, license_plate_number, customer_comments, brand,
+      // last_updated, order_date — quantity only, never a refund amount. Per
+      // Jaclyn: estimate the dollar impact of each Amazon return as
+      // (returned quantity × that ASIN's item_price from the Orders sheet).
+      // Averaged across all fetched order rows for that ASIN rather than
+      // "most recent" to smooth out promo/coupon price swings on any single
+      // order.
+      function buildAsinPriceMap(rows) {
+        const sums = {}, counts = {};
+        rows.forEach(r => {
+          const asin = (r.asin || '').trim().toUpperCase();
+          const price = parseAmt(r.item_price);
+          if (!asin || !price) return;
+          sums[asin] = (sums[asin] || 0) + price;
+          counts[asin] = (counts[asin] || 0) + 1;
+        });
+        const avg = {};
+        Object.keys(sums).forEach(k => { avg[k] = sums[k] / counts[k]; });
+        return avg;
+      }
+      // Website (Google Ads) MTD and prior-MTD totals — computed once, up
+      // front, since both the Ad-Driven Orders KPI and the Ad Spend/Blended
+      // ACOS KPI need them. Both are true day-level sums (no proration
+      // needed on the Website side, unlike Amazon's monthly-bucketed data).
+      const amzPriceByAsin = buildAsinPriceMap(amzRows);
+
+      // Website (Google) ads data — see fetch comments above for tab/column
+      // details. Both tabs are real day-level data (unlike Amazon's
+      // month-bucketed ad_orders sheet), so true MTD sums are possible
+      // directly — no proration needed on the Website side.
+      const webAdsRows = isCsv(webAdsCsv) ? parseCsv(webAdsCsv) : [];
+      const webShoppingRows = isCsv(webShoppingCsv) ? parseCsv(webShoppingCsv) : [];
+
+      // Sums spend/revenue/conversions from the "ads" tab within a date
+      // range. `conversions` can be fractional (Google's attribution model
+      // spreads partial credit across campaigns) so it's kept as a float
+      // here and only rounded once, at the point it's displayed as a whole
+      // "orders" count.
+      function sumWebAdsRange(rows, startStr, endStr) {
+        let spend = 0, revenue = 0, conversions = 0;
+        rows.forEach(r => {
+          const d = normalizeDate(r.date);
+          if (!d || d < startStr || d > endStr) return;
+          spend += parseAmt(r.spend);
+          revenue += parseAmt(r.revenue);
+          conversions += parseFloat(r.conversions) || 0;
+        });
+        return { spend, revenue, conversions };
+      }
+
+      // Per-ASIN Website ad units from the "shopping" tab (PMAX only — the
+      // only Google campaign type with SKU-level data, per Jaclyn). Column
+      // is literally "SKU" (uppercase) on this tab, unlike everywhere else
+      // on this page — checked defensively (r.SKU || r.sku) since a header
+      // casing mismatch is exactly the kind of thing that silently breaks
+      // this page (see Amazon returns $ field, fixed 2026-08-05).
+      function webShoppingUnitsByAsin(rows, startStr, endStr, skuMap) {
+        const map = {};
+        rows.forEach(r => {
+          const d = normalizeDate(r.date);
+          if (!d || d < startStr || d > endStr) return;
+          const sku = (r.SKU || r.sku || '').trim().toUpperCase().replace(/-SF$/i, '');
+          if (!sku) return;
+          const key = (skuMap && skuMap[sku]) || sku;
+          map[key] = (map[key] || 0) + (parseFloat(r.conversions) || 0);
+        });
+        Object.keys(map).forEach(k => { map[k] = Math.round(map[k]); });
+        return map;
+      }
+
+      // Website (Google Ads) MTD and prior-MTD totals — computed once, up
+      // front, since both the Ad-Driven Orders KPI and the Ad Spend/Blended
+      // ACOS KPI need them below. Both are true day-level sums (no
+      // proration needed on the Website side, unlike Amazon's
+      // monthly-bucketed ad_orders data).
+      const webAdsMtd = sumWebAdsRange(webAdsRows, mtdStartStr, mtdEndStr);
+      const webAdsPrevMtd = sumWebAdsRange(webAdsRows, prevStartStr, prevEndStr);
+
+      // ── Returns netting ──────────────────────────────────────────────
+      // Dated by when the RETURN happened (return_date/refund_date), not
+      // when the original order was placed — same convention already
+      // established by the existing "Returns Processed" KPI (Marketing →
+      // Fulfillment & CS / mfcLoadReturns()). Brand-filtered via the same
+      // accent-stripped isEvolisRow() check used everywhere else in this
+      // file, since these are shared, multi-brand sheets.
+      //
+      // FIELD NAMES: Walmart (quantity, refund_amount, return_date) and
+      // Website/Shopify (quantity, refund_amount, refund_date) are BOTH
+      // CONFIRMED — see the comments on OV_WMT_RETURNS_GID / OV_WEB_RETURNS_GID
+      // further down this file. Amazon's Returns sheet is ALSO confirmed as
+      // of 2026-08-05 (fetched and inspected directly): return_date,
+      // order_id, sku, asin, fnsku, product_name, quantity,
+      // fulfillment_center_id, detailed_disposition, reason, status,
+      // license_plate_number, customer_comments, brand, last_updated,
+      // order_date — there is NO dollar/refund-amount column on the Amazon
+      // side at all (Amazon's FBA returns report only ever tracks units,
+      // never $). Per Jaclyn (2026-08-05): estimate each Amazon return's
+      // dollar impact as (returned quantity × that ASIN's average
+      // item_price, pulled from the Amazon Orders sheet — see
+      // amzPriceByAsin above) rather than trying to read a $ field that
+      // doesn't exist.
+      //
+      // byAsin: also builds a per-ASIN returned-quantity map, used further
+      // down to net Active SKUs and the Top Selling Products table. Amazon
+      // rows carry their own `asin` column directly; Walmart/Website rows
+      // only ever carry a `sku`, so those are resolved through
+      // skuToAsinMap (falling back to the raw SKU if no crosswalk entry
+      // exists) — same convention as unitsByAsin() elsewhere on this page.
+      function aggregateReturnsRange(csv, startStr, endStr, dateField, opts) {
+        opts = opts || {};
+        if (!isCsv(csv)) return { totalQty: 0, totalAmt: 0, byAsin: {} };
+        const filtered = parseCsv(csv).filter(r => {
+          if (!isEvolisRow(r)) return false;
+          const d = normalizeDate(r[dateField]);
+          return d && d >= startStr && d <= endStr;
+        });
+        let totalQty = 0, totalAmt = 0;
+        const byAsin = {};
+        filtered.forEach(r => {
+          const qty = parseInt(r.quantity, 10) || 0;
+          totalQty += qty;
+          let key = (r.asin || '').trim().toUpperCase();
+          if (!key) {
+            const sku = (r.sku || '').trim().toUpperCase().replace(/-SF$/i, '');
+            key = (skuToAsinMap && skuToAsinMap[sku]) || sku;
+          }
+          if (key) byAsin[key] = (byAsin[key] || 0) + qty;
+          totalAmt += opts.useAsinPrice ? qty * (amzPriceByAsin[key] || 0) : parseAmt(r.refund_amount);
+        });
+        return { totalQty, totalAmt, byAsin };
+      }
+
+      const amzReturnsMtd  = aggregateReturnsRange(amzReturnsCsv, mtdStartStr, mtdEndStr, 'return_date', { useAsinPrice: true });
+      const amzReturnsPrev = aggregateReturnsRange(amzReturnsCsv, prevStartStr, prevEndStr, 'return_date', { useAsinPrice: true });
+      const wmtReturnsMtd  = aggregateReturnsRange(wmtReturnsCsv, mtdStartStr, mtdEndStr, 'return_date');
+      const wmtReturnsPrev = aggregateReturnsRange(wmtReturnsCsv, prevStartStr, prevEndStr, 'return_date');
+      const webReturnsMtd  = aggregateReturnsRange(webReturnsCsv, mtdStartStr, mtdEndStr, 'refund_date');
+      const webReturnsPrev = aggregateReturnsRange(webReturnsCsv, prevStartStr, prevEndStr, 'refund_date');
+      console.log('[Evolis][overview] returns this MTD \u2014 amazon:', amzReturnsMtd, 'walmart:', wmtReturnsMtd, 'website:', webReturnsMtd);
+
+      const amzMtd = aggregateRange(amzRows, mtdStartStr, mtdEndStr, isValidAmazonRow);
+      const webMtd = aggregateRange(webRows, mtdStartStr, mtdEndStr, isValidWebRow, true);
+      const wmtMtd = aggregateRange(wmtRows, mtdStartStr, mtdEndStr, isValidWalmartRow);
+      const amzPrev = aggregateRange(amzRows, prevStartStr, prevEndStr, isValidAmazonRow);
+      const webPrev = aggregateRange(webRows, prevStartStr, prevEndStr, isValidWebRow, true);
+      const wmtPrev = aggregateRange(wmtRows, prevStartStr, prevEndStr, isValidWalmartRow);
+
+      // Net revenue/units against returns dated in the same window (see
+      // returns-netting block above). Deliberately NOT applied to order
+      // COUNT — these returns sheets are quantity/line-item-level, not a
+      // "this whole order was cancelled" flag, so there's no clean way to
+      // decrement an order count from them without assuming every return
+      // means a fully-cancelled order, which isn't true for partial
+      // returns. Order counts below stay gross. Also NOT applied to the
+      // per-ASIN Top Selling Products table further down (that would need
+      // each return row mapped SKU→ASIN too — a separate, larger change;
+      // flag if that\u2019s wanted next).
+      const amzMtdNetRevenue = amzMtd.totalRevenue - amzReturnsMtd.totalAmt;
+      const webMtdNetRevenue = webMtd.totalRevenue - webReturnsMtd.totalAmt;
+      const wmtMtdNetRevenue = wmtMtd.totalRevenue - wmtReturnsMtd.totalAmt;
+      const amzPrevNetRevenue = amzPrev.totalRevenue - amzReturnsPrev.totalAmt;
+      const webPrevNetRevenue = webPrev.totalRevenue - webReturnsPrev.totalAmt;
+      const wmtPrevNetRevenue = wmtPrev.totalRevenue - wmtReturnsPrev.totalAmt;
+      const amzMtdNetUnits = Math.max(0, amzMtd.totalUnits - amzReturnsMtd.totalQty);
+      const webMtdNetUnits = Math.max(0, webMtd.totalUnits - webReturnsMtd.totalQty);
+      const wmtMtdNetUnits = Math.max(0, wmtMtd.totalUnits - wmtReturnsMtd.totalQty);
+      const amzPrevNetUnits = Math.max(0, amzPrev.totalUnits - amzReturnsPrev.totalQty);
+      const webPrevNetUnits = Math.max(0, webPrev.totalUnits - webReturnsPrev.totalQty);
+      const wmtPrevNetUnits = Math.max(0, wmtPrev.totalUnits - wmtReturnsPrev.totalQty);
+
+      // UPDATED 2026-08-28 — ported from Skinuva's proven toggle
+      // architecture. UNLIKE Skinuva (which deliberately excludes
+      // Website from every Overview metric per a Skinuva-specific
+      // request), évolis KEEPS Website included here — per Jaclyn's
+      // explicit instruction, that exclusion does not apply to évolis.
+      const mtd  = { units: amzMtdNetUnits + webMtdNetUnits + wmtMtdNetUnits, orders: amzMtd.totalOrders + webMtd.totalOrders + wmtMtd.totalOrders, revenue: amzMtdNetRevenue + webMtdNetRevenue + wmtMtdNetRevenue };
+      const prev = { units: amzPrevNetUnits + webPrevNetUnits + wmtPrevNetUnits, orders: amzPrev.totalOrders + webPrev.totalOrders + wmtPrev.totalOrders, revenue: amzPrevNetRevenue + webPrevNetRevenue + wmtPrevNetRevenue };
+      const aov = mtd.orders ? mtd.revenue / mtd.orders : 0;
+      const aovPrev = prev.orders ? prev.revenue / prev.orders : 0;
+
+      // ADDED 2026-08-28 per Jaclyn/Skinuva parity — Total Sales KPI,
+      // Amazon + Walmart + Website (mtd.revenue/prev.revenue already
+      // include Website for évolis, see note above).
+      setKpi('ov-kpi-total-sales', '$' + mtd.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 }), pctChange(mtd.revenue, prev.revenue), ovMomSuffixReal);
+      setKpi('ov-kpi-units',  mtd.units.toLocaleString(),  pctChange(mtd.units, prev.units), ovMomSuffixReal);
+      setKpi('ov-kpi-orders', mtd.orders.toLocaleString(), pctChange(mtd.orders, prev.orders), ovMomSuffixReal);
+      setKpi('ov-kpi-aov',    '$' + aov.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), pctChange(Math.round(aov * 100), Math.round(aovPrev * 100)), ovMomSuffixReal);
+
+      // -- MTD Ad-Driven Orders / Pending Orders --
+      // Amazon: per Jaclyn (2026-07-24), the ad orders cron runs daily and
+      // captures every order, but only buckets by month — no day-of-purchase
+      // field — so a true day-level MTD-vs-MTD comparison isn't possible.
+      // No MOM badge there solves that: the current month's row count IS
+      // already "so far this month" by construction (the cron only ever
+      // adds today's orders as they happen), no proration needed. Each row
+      // is one order-level event (confirmed by Jaclyn), not a
+      // pre-aggregated units total, so counting rows = the actual
+      // ad-driven order count directly.
+      // Website: added 2026-08-05 per Jaclyn — Google Ads' "ads" tab is
+      // real day-level data, so its `conversions` column is simply summed
+      // over the MTD window (see webAdsMtd above) and added to Amazon's
+      // count for one blended figure. No MOM here either, to avoid mixing
+      // an exact Website sum with Amazon's monthly-bucketed estimate.
+      let adDrivenOrders = 0;
+      let adDrivenOrdersLastMonthFull = 0;
+      // FIXED 2026-08-28 — ported from Skinuva's real, confirmed fix.
+      // Two separate bugs here: (1) lastMonthYear/lastMonthNum used to be
+      // redeclared locally from now(), shadowing the cfg-driven ones
+      // declared at the top of this function — this card would have
+      // silently stayed stuck on live data while every other card on the
+      // page switched to Last Month. Now reuses the outer refYear/
+      // refMonth/lastMonthYear/lastMonthNum, no local redeclaration.
+      // (2) Real incident confirmed live on Skinuva ("why are we seeing
+      // only 16 ad driven units"): this sheet is monthly-grain per ASIN
+      // (one row per ASIN per month, its own ad_units column) — .length
+      // was counting those ROWS as if each were one order/unit, instead
+      // of summing ad_units (16 rows, but ad_units totaled 436). Every
+      // other place in this file that reads this exact sheet already
+      // sums ad_units per row — this was the one place still treating it
+      // as one-row-per-order.
+      if (isCsv(adOrdersCsv)) {
+        const adRowsForOrders = parseCsv(adOrdersCsv);
+        const sumAdUnits = rows => rows.reduce((s, r) => s + (parseInt(String(r.ad_units || '').replace(/^'/, ''), 10) || 0), 0);
+        adDrivenOrders = sumAdUnits(adRowsForOrders.filter(r =>
+          parseInt(r.year, 10) === refYear &&
+          parseInt(r.month, 10) === refMonth &&
+          (r.brand || '').trim().toLowerCase() === 'evolis'
+        ));
+        adDrivenOrdersLastMonthFull = sumAdUnits(adRowsForOrders.filter(r =>
+          parseInt(r.year, 10) === lastMonthYear &&
+          parseInt(r.month, 10) === lastMonthNum &&
+          (r.brand || '').trim().toLowerCase() === 'evolis'
+        ));
+      }
+
+      // Walmart — added 2026-08-06 per Jaclyn, explicit choice: sum
+      // ad_units from SHEET_WALMART_AD_ORDERS and add it into this same
+      // blended figure, same as Amazon's real order count and Website's
+      // real conversion count. This means the figure is a mix of true
+      // order counts (Amazon, Website) and an ad-attributed UNIT count
+      // (Walmart) — a deliberate simplicity tradeoff, not an oversight.
+      // Walmart's sheet only ever contains rows with real spend
+      // (zero-spend rows filtered server-side), so every unit here
+      // reflects genuine ad activity.
+      let walmartAdUnitsThisMonth = 0;
+      try {
+        const wmtAdOrdersCsvForOrders = await fetch(sheetCsvUrl(WALMART_AD_ORDERS_SHEET_ID, WALMART_AD_ORDERS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => '');
+        if (isCsv(wmtAdOrdersCsvForOrders)) {
+          walmartAdUnitsThisMonth = parseCsv(wmtAdOrdersCsvForOrders)
+            .filter(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth)
+            .reduce((s, r) => s + (parseInt(r.ad_units, 10) || 0), 0);
+        }
+      } catch (e) { console.warn('[Evolis][overview] Walmart ad units (for Ad-Driven Orders) lookup failed:', e.message); }
+
+      setKpiPlain('ov-kpi-ad-orders', (adDrivenOrders + Math.round(webAdsMtd.conversions) + walmartAdUnitsThisMonth).toLocaleString(), (cfg.isPartial ? 'This month' : 'Last month') + ' (Amazon + Google Ads + Walmart ad units)');
+      // NOTE: this card's own MOM/"Organic Orders" companion logic moved
+      // further down — see "MTD Organic Units" below, after per-ASIN net
+      // units and ad-attributed units are available. Per Jaclyn
+      // (2026-08-05): that KPI switched from an order count to a UNITS
+      // figure so returned units can actually be subtracted from it (the
+      // returns sheets are line-item/qty level, not a "whole order
+      // cancelled" flag, so there was no clean way to net an order COUNT
+      // against them).
+
+      // Pending Orders — a live snapshot, intentionally NOT date-scoped
+      // (an order still sitting in Pending from any date is still open and
+      // worth surfacing, not just ones placed this month). Amazon only,
+      // per Jaclyn's source (SHEET_ORDERS).
+      const pendingOrderIds = new Set(
+        amzRows.filter(r => (r.status || '').trim().toLowerCase() === 'pending')
+               .map(r => r.order_id).filter(Boolean)
+      );
+      setKpiPlain('ov-kpi-pending', pendingOrderIds.size.toLocaleString(), 'Currently open');
+
+      const heroRevEl = document.getElementById('ov-hero-revenue');
+      if (heroRevEl) heroRevEl.textContent = mtd.revenue >= 1000 ? '$' + (mtd.revenue / 1000).toFixed(1) + 'K' : '$' + mtd.revenue.toFixed(0);
+
+      // -- Combined product table: units per ASIN per channel, MTD, with MOM + Amazon ads/organic split --
+      // asinNameMap / skuToAsinMap were already built earlier (up front,
+      // before returns netting needed them too).
+      //
+      // Added 2026-08-05 per Jaclyn: net each channel's per-ASIN units
+      // against that same channel's returns (amzReturnsMtd.byAsin /
+      // wmtReturnsMtd.byAsin / webReturnsMtd.byAsin, built above), floored
+      // at 0 per ASIN so a heavily-returned item can't go negative and drag
+      // down the rest of the total. This feeds both the Top Selling
+      // Products table AND the Active SKUs hero stat below (an ASIN with
+      // net units of 0 no longer counts as "active with sales").
+      function netByAsin(gross, returns) {
+        const out = {};
+        Object.keys(gross).forEach(asin => {
+          out[asin] = Math.max(0, gross[asin] - (returns[asin] || 0));
+        });
+        return out;
+      }
+      const amzUnitsByAsin = netByAsin(unitsByAsin(amzMtd.filteredRows, skuToAsinMap), amzReturnsMtd.byAsin);
+      const webUnitsByAsin = netByAsin(unitsByAsin(webMtd.filteredRows, skuToAsinMap), webReturnsMtd.byAsin);
+      const wmtUnitsByAsin = netByAsin(unitsByAsin(wmtMtd.filteredRows, skuToAsinMap), wmtReturnsMtd.byAsin);
+      const amzPrevUnitsByAsin = netByAsin(unitsByAsin(amzPrev.filteredRows, skuToAsinMap), amzReturnsPrev.byAsin);
+      const webPrevUnitsByAsin = netByAsin(unitsByAsin(webPrev.filteredRows, skuToAsinMap), webReturnsPrev.byAsin);
+      const wmtPrevUnitsByAsin = netByAsin(unitsByAsin(wmtPrev.filteredRows, skuToAsinMap), wmtReturnsPrev.byAsin);
+      const allAsins = new Set([...Object.keys(amzUnitsByAsin), ...Object.keys(webUnitsByAsin), ...Object.keys(wmtUnitsByAsin)]);
+
+      // Active SKUs (hero stat) — count of ASINs with net units > 0 across
+      // all three channels combined, MTD. Replaces the old gross-SKU-set
+      // count (which counted any ASIN with an order line at all, even if
+      // every unit sold was later returned).
+      const activeSkuCount = Array.from(allAsins).filter(asin =>
+        (amzUnitsByAsin[asin] || 0) + (webUnitsByAsin[asin] || 0) + (wmtUnitsByAsin[asin] || 0) > 0
+      ).length;
+      const heroSkuEl = document.getElementById('ov-hero-skus');
+      if (heroSkuEl && activeSkuCount > 0) heroSkuEl.textContent = String(activeSkuCount);
+
+      // Ads vs Organic — Amazon + Website + Walmart (Walmart added
+      // 2026-08-06 per Jaclyn). Amazon's and Walmart's ad sheets are
+      // pre-aggregated by whole month, not by day, so this reflects the
+      // CURRENT month's ad units as tracked so far (same caveat as the
+      // Ad Spend/ACOS estimate above) rather than a precise MTD figure.
+      let adUnitsByAsin = {};
+      let adUnitsByAsinPrev = {};
+      try {
+        const adOrdersCsv2 = await fetch(sheetCsvUrl('1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI', '158578426') + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => '');
+        if (isCsv(adOrdersCsv2)) {
+          const adRows2All = parseCsv(adOrdersCsv2);
+          adRows2All.filter(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth)
+            .forEach(r => {
+              const asin = (r.asin || '').trim().toUpperCase();
+              if (!asin) return;
+              adUnitsByAsin[asin] = (adUnitsByAsin[asin] || 0) + (parseInt(r.ad_units, 10) || 0);
+            });
+          // Same month used for the Organic Units MOM comparison below.
+          adRows2All.filter(r => parseInt(r.year, 10) === lastMonthYear && parseInt(r.month, 10) === lastMonthNum)
+            .forEach(r => {
+              const asin = (r.asin || '').trim().toUpperCase();
+              if (!asin) return;
+              adUnitsByAsinPrev[asin] = (adUnitsByAsinPrev[asin] || 0) + (parseInt(r.ad_units, 10) || 0);
+            });
+        }
+      } catch (e) { console.warn('[Evolis][overview] ad units lookup failed:', e.message); }
+
+      // Walmart per-ASIN ad units — added 2026-08-06 per Jaclyn. Joined
+      // via item_id -> asin (walmartItemIdToAsinMap, built earlier from
+      // column I of the Product Short Name sheet). Walmart's item-level
+      // ad sheet only ever contains rows with real spend (zero-spend rows
+      // filtered server-side by upload-walmart-ads.js), so every row here
+      // is genuine ad activity.
+      let wmtAdUnitsByAsin = {};
+      let wmtAdUnitsByAsinPrev = {};
+      try {
+        const wmtAdOrdersCsv2 = await fetch(sheetCsvUrl(WALMART_AD_ORDERS_SHEET_ID, WALMART_AD_ORDERS_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => '');
+        if (isCsv(wmtAdOrdersCsv2)) {
+          const wmtAdRows2All = parseCsv(wmtAdOrdersCsv2);
+          wmtAdRows2All.filter(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth)
+            .forEach(r => {
+              const asin = walmartItemIdToAsinMap[(r.item_id || '').trim()];
+              if (!asin) return; // no Walmart Item ID -> ASIN mapping for this row — skipped, not guessed
+              wmtAdUnitsByAsin[asin] = (wmtAdUnitsByAsin[asin] || 0) + (parseInt(r.ad_units, 10) || 0);
+            });
+          wmtAdRows2All.filter(r => parseInt(r.year, 10) === lastMonthYear && parseInt(r.month, 10) === lastMonthNum)
+            .forEach(r => {
+              const asin = walmartItemIdToAsinMap[(r.item_id || '').trim()];
+              if (!asin) return;
+              wmtAdUnitsByAsinPrev[asin] = (wmtAdUnitsByAsinPrev[asin] || 0) + (parseInt(r.ad_units, 10) || 0);
+            });
+        }
+      } catch (e) { console.warn('[Evolis][overview] Walmart per-ASIN ad units lookup failed:', e.message); }
+
+      // -- MTD Organic Units (net of returns, net of BOTH Amazon + Website ads) --
+      // Changed 2026-08-05 per Jaclyn: this card used to be "MTD Organic
+      // ORDERS" (a count), which couldn't cleanly subtract returns (those
+      // sheets are line-item/qty level, not a "whole order cancelled"
+      // flag). Switched to UNITS instead, which the returns data nets
+      // against cleanly: Organic Units = total net blended units (mtd.units,
+      // already netted above) minus Amazon ad-attributed units minus
+      // Website ad-attributed units, each capped per ASIN at that channel's
+      // own net units so an ASIN's ad units can never exceed what actually
+      // sold net of returns (same guard used per-row in the Top Selling
+      // Products table below). Website ad units come from the "shopping"
+      // tab (Google PMAX campaigns only — the one Google campaign type with
+      // SKU-level data — so this under-counts Website ad units from any
+      // other Google campaign type; best available source per Jaclyn).
+      const webShopUnitsByAsin = webShoppingUnitsByAsin(webShoppingRows, mtdStartStr, mtdEndStr, skuToAsinMap);
+      const webShopUnitsByAsinPrev = webShoppingUnitsByAsin(webShoppingRows, prevStartStr, prevEndStr, skuToAsinMap);
+      const totalAdUnitsCurr = Array.from(allAsins).reduce((s, asin) =>
+        s + Math.min(adUnitsByAsin[asin] || 0, amzUnitsByAsin[asin] || 0)
+          + Math.min(webShopUnitsByAsin[asin] || 0, webUnitsByAsin[asin] || 0)
+          + Math.min(wmtAdUnitsByAsin[asin] || 0, wmtUnitsByAsin[asin] || 0), 0);
+      const allAsinsPrev = new Set([...Object.keys(amzPrevUnitsByAsin), ...Object.keys(webPrevUnitsByAsin), ...Object.keys(wmtPrevUnitsByAsin)]);
+      const totalAdUnitsPrev = Array.from(allAsinsPrev).reduce((s, asin) =>
+        s + Math.min(adUnitsByAsinPrev[asin] || 0, amzPrevUnitsByAsin[asin] || 0)
+          + Math.min(webShopUnitsByAsinPrev[asin] || 0, webPrevUnitsByAsin[asin] || 0)
+          + Math.min(wmtAdUnitsByAsinPrev[asin] || 0, wmtPrevUnitsByAsin[asin] || 0), 0);
+      const organicUnits = Math.max(0, mtd.units - totalAdUnitsCurr);
+      const organicUnitsPrev = Math.max(0, prev.units - totalAdUnitsPrev);
+      setKpi('ov-kpi-organic-orders', organicUnits.toLocaleString(), pctChange(organicUnits, organicUnitsPrev), ovMomSuffix);
+
+      // ADDED 2026-09-04 per Jaclyn — Conv% for Top Selling Products,
+      // same styling as the PPC page's Product Performance table
+      // (rank-pill, green >=15%, amber otherwise). Honest scope note:
+      // this is Amazon-only (units ÷ sessions), NOT blended across all
+      // 3 channels — Business Report has no Website/Walmart sessions
+      // equivalent, so mixing all-channel units into this rate would
+      // silently inflate it against a denominator that only covers part
+      // of the numerator. Column header says "(Amazon)" for the same
+      // reason, rather than presenting it as a whole-business rate.
+      const sessionsByAsinCurr = {};
+      bizRows.forEach(r => {
+        if (parseInt(r.year, 10) === cfg.year && parseInt(r.month, 10) === cfg.month) {
+          const asin = (r.asin || '').trim().toUpperCase();
+          if (asin) sessionsByAsinCurr[asin] = (sessionsByAsinCurr[asin] || 0) + (parseInt(r.sessions, 10) || 0);
+        }
+      });
+      function convCell(amazonUnits, asin) {
+        const sessions = sessionsByAsinCurr[asin] || 0;
+        if (!sessions) return '<span class="tp-dash">—</span>';
+        const conv = (amazonUnits / sessions) * 100;
+        const convClass = conv >= 15 ? 'rank-top' : (conv > 0 ? 'rank-low' : 'rank-none');
+        return `<span class="rank-pill ${convClass}">${conv.toFixed(2)}%</span>`;
+      }
+
+      function momBadge(curr, prevVal) {
+        if (!prevVal) return '';
+        const p = Math.round(((curr - prevVal) / prevVal) * 100);
+        if (p > 0) return `<span class="tp-mom-up">▲ ${p}%</span>`;
+        if (p < 0) return `<span class="tp-mom-dn">▼ ${Math.abs(p)}%</span>`;
+        return `<span class="tp-mom-flat">—</span>`;
+      }
+      function unitCell(curr, prevVal) {
+        if (!curr) return '<span class="tp-dash">—</span>';
+        return `<span class="tp-units">${curr.toLocaleString()}</span>${momBadge(curr, prevVal)}`;
+      }
+
+      const productRows = Array.from(allAsins).map(asin => {
+        const a = amzUnitsByAsin[asin] || 0, w = webUnitsByAsin[asin] || 0, m = wmtUnitsByAsin[asin] || 0;
+        const aPrev = amzPrevUnitsByAsin[asin] || 0, wPrev = webPrevUnitsByAsin[asin] || 0, mPrev = wmtPrevUnitsByAsin[asin] || 0;
+        const total = a + w + m, totalPrev = aPrev + wPrev + mPrev;
+        // Ad units = Amazon Ads (capped at Amazon's own net units) + Google
+        // Ads via the "shopping" tab (capped at Website's own net units)
+        // + Walmart Ads (capped at Walmart's own net units, added
+        // 2026-08-06 per Jaclyn).
+        const adUnits = Math.min(adUnitsByAsin[asin] || 0, a) + Math.min(webShopUnitsByAsin[asin] || 0, w) + Math.min(wmtAdUnitsByAsin[asin] || 0, m);
+        const orgUnits = total - adUnits;
+        return { asin, name: asinNameMap[asin] || asin, amazon: a, amazonPrev: aPrev, website: w, websitePrev: wPrev, walmart: m, walmartPrev: mPrev, total, totalPrev, adUnits, orgUnits };
+      }).sort((x, y) => y.total - x.total).slice(0, 15);
+
+      const tbody = document.getElementById('ov-products-tbody');
+      if (tbody) {
+        if (!productRows.length) {
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted);">No sales yet this month.</td></tr>';
+        } else {
+          tbody.innerHTML = productRows.map((r, i) => `
+            <tr>
+              <td style="padding:7px 10px;">${i + 1}.</td>
+              <td style="padding:7px 10px;">${r.name}</td>
+              <td style="padding:7px 10px;"><div class="tp-cell">${unitCell(r.amazon, r.amazonPrev)}</div></td>
+              <td style="padding:7px 10px;"><div class="tp-cell">${unitCell(r.website, r.websitePrev)}</div></td>
+              <td style="padding:7px 10px;"><div class="tp-cell">${unitCell(r.walmart, r.walmartPrev)}</div></td>
+              <td style="padding:7px 10px;"><div class="tp-cell">${unitCell(r.total, r.totalPrev)}</div></td>
+              <td style="padding:7px 10px;">${r.adUnits > 0 ? `<span class="tp-units">${r.adUnits.toLocaleString()}</span>` : '<span class="tp-dash">—</span>'}</td>
+              <td style="padding:7px 10px;">${r.orgUnits > 0 ? `<span class="tp-units">${r.orgUnits.toLocaleString()}</span>` : '<span class="tp-dash">—</span>'}</td>
+              <td style="padding:7px 10px;">${convCell(r.amazon, r.asin)}</td>
+            </tr>`).join('');
+        }
+      }
+
+      // -- Donut: revenue share by channel (real MTD revenue, net of returns) --
+      // Switched to the net figures 2026-08-03 — using gross here while the
+      // hero KPI above uses net would make the donut's total silently not
+      // match the hero number, which is worse than either being wrong alone.
+      const donutTotal = amzMtdNetRevenue + webMtdNetRevenue + wmtMtdNetRevenue;
+      if (donutTotal > 0) {
+        // FIXED 2026-09-01 — confirmed live: "Canvas is already in use.
+        // Chart with ID 'X' must be destroyed before the canvas ... can
+        // be reused." This function used to run once per page load; now
+        // it can run again on every toggle click, and nothing was ever
+        // destroying the prior instance before creating a new one on the
+        // same canvas. window._ovDonutChart was already being assigned
+        // (tracked), just never actually used to clean up — same failure
+        // class as the PDF export canvas-reuse bug documented earlier.
+        if (window._ovDonutChart) { window._ovDonutChart.destroy(); window._ovDonutChart = null; }
+        const fmtDollar = n => '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // ADDED 2026-09-04 per Jaclyn — "show totals" on this chart.
+        // Center-text plugin for the grand total (a real doughnut has no
+        // built-in center-text support in Chart.js), plus a custom
+        // tooltip formatter so hovering a segment shows a real dollar
+        // figure ("$2,496.47") instead of Chart.js's default raw,
+        // unformatted number. This is a live-dashboard-only plugin, not
+        // part of any PDF export capture path — the custom-plugin-text-
+        // invisible-to-font-scaling risk documented in the PDF export
+        // playbook doesn't apply here, but worth remembering if this
+        // chart is ever added to a PDF export later.
+        const centerTextPlugin = {
+          id: 'ovDonutCenterText',
+          afterDraw(chart) {
+            const { ctx, chartArea: { left, right, top, bottom } } = chart;
+            const cx = (left + right) / 2, cy = (top + bottom) / 2;
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '700 15px var(--font-subheader, sans-serif)';
+            ctx.fillStyle = '#001f60';
+            ctx.fillText(fmtDollar(donutTotal), cx, cy - 8);
+            ctx.font = '600 10px sans-serif';
+            ctx.fillStyle = '#6b7ba2';
+            ctx.fillText('TOTAL', cx, cy + 10);
+            ctx.restore();
+          }
+        };
+        window._ovDonutChart = new Chart(document.getElementById('chart-ov-donut'), {
+          type: 'doughnut',
+          data: {
+            labels: ['Amazon', 'Website', 'Walmart'],
+            datasets: [{ data: [amzMtdNetRevenue, webMtdNetRevenue, wmtMtdNetRevenue], backgroundColor: ['#001f60', '#24e9a3', '#6b7ba2'], borderWidth: 0 }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 10, font: { size: 12 } } },
+              tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmtDollar(ctx.parsed)}` } },
+            }
+          },
+          plugins: [centerTextPlugin],
+        });
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // AD SPEND BY TYPE (SP/SB/SD) — added 2026-09-11 per Jaclyn.
+      // Brand-wide only — confirmed directly from the real Ad Orders
+      // Cache file that ASIN-level ad data has no SP/SB/SD split at all,
+      // so there's no per-product version of this chart to build. The
+      // Advertising Cache sheet DOES have this split (sp_spend, sb_spend,
+      // sd_spend, real column names confirmed from the actual file, not
+      // assumed), one row per year/month — no proration needed even for
+      // MTD, since this is a composition/breakdown (% of spend so far),
+      // not an absolute total being projected forward.
+      try {
+        const adSummaryRows = parseCsvToRows(adSummaryCsv);
+        const adRow = adSummaryRows.find(r => parseInt(r.year, 10) === cfg.year && parseInt(r.month, 10) === cfg.month);
+        const numOr0 = v => parseFloat(String(v || '0').replace(/[$,]/g, '')) || 0;
+        const spSpend = adRow ? numOr0(adRow.sp_spend) : 0;
+        const sbSpend = adRow ? numOr0(adRow.sb_spend) : 0;
+        const sdSpend = adRow ? numOr0(adRow.sd_spend) : 0;
+        const adTypeTotal = spSpend + sbSpend + sdSpend;
+
+        const adTypeTitleEl = document.getElementById('ov-ad-type-title');
+        if (adTypeTitleEl) adTypeTitleEl.textContent = `Ad Spend by Type — ${cfg.isPartial ? 'Month to Date' : 'Last Full Month'}`;
+
+        const adTypeNoteEl = document.getElementById('ov-ad-type-note');
+        if (adTypeNoteEl) {
+          // Honest note when SB/SD are genuinely zero right now, rather
+          // than letting a 100%/0%/0% chart look like something's
+          // broken — confirmed this is real, current spend data, not a
+          // missing-data gap, before writing this note.
+          if (adTypeTotal > 0 && sbSpend === 0 && sdSpend === 0) {
+            adTypeNoteEl.textContent = 'ℹ 100% Sponsored Products this period — no active Sponsored Brands or Sponsored Display spend.';
+          } else {
+            adTypeNoteEl.textContent = '';
+          }
+        }
+
+        if (adTypeTotal > 0) {
+          if (window._ovAdTypeChart) { window._ovAdTypeChart.destroy(); window._ovAdTypeChart = null; }
+          window._ovAdTypeChart = new Chart(document.getElementById('chart-ov-ad-type'), {
+            type: 'doughnut',
+            data: {
+              labels: ['Sponsored Products', 'Sponsored Brands', 'Sponsored Display'],
+              datasets: [{ data: [spSpend, sbSpend, sdSpend], backgroundColor: ['#001f60', '#24e9a3', '#c87d2f'], borderWidth: 0 }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 10, font: { size: 12 } } },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.label}: $${ctx.parsed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` } },
+              }
+            },
+          });
+        } else {
+          const cardEl = document.getElementById('ov-ad-type-card');
+          if (cardEl && adTypeNoteEl) adTypeNoteEl.textContent = 'No ad spend recorded for this period yet.';
+        }
+
+        // ADDED 2026-09-11 per Jaclyn — per-type breakdown table below
+        // the chart (# campaigns, ACOS, spend, sales), so a 100%/0%/0%
+        // period still shows something useful (0 campaigns running for
+        // SB/SD explicitly, not just an empty chart segment). All 3 rows
+        // always shown, even at zero — real column names confirmed
+        // directly from the actual sheet, not assumed.
+        const adTypeTbody = document.getElementById('ov-ad-type-tbody');
+        if (adTypeTbody && adRow) {
+          const fmtD = n => '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const rows = [
+            { name: 'Sponsored Products', campaigns: adRow.sp_campaigns_running, acos: adRow.sp_acos, spend: spSpend, sales: numOr0(adRow.sp_sales) },
+            { name: 'Sponsored Brands',   campaigns: adRow.sb_campaigns_running, acos: adRow.sb_acos, spend: sbSpend, sales: numOr0(adRow.sb_sales) },
+            { name: 'Sponsored Display',  campaigns: adRow.sd_campaigns_running, acos: adRow.sd_acos, spend: sdSpend, sales: numOr0(adRow.sd_sales) },
+          ];
+          adTypeTbody.innerHTML = rows.map(r => {
+            const campaignCount = parseInt(r.campaigns, 10) || 0;
+            const acosVal = numOr0(r.acos);
+            return `<tr>
+              <td>${r.name}</td>
+              <td>${campaignCount}</td>
+              <td>${acosVal > 0 ? acosVal.toFixed(1) + '%' : '<span class="tp-dash">—</span>'}</td>
+              <td>${fmtD(r.spend)}</td>
+              <td>${fmtD(r.sales)}</td>
+            </tr>`;
+          }).join('');
+        } else if (adTypeTbody) {
+          adTypeTbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);">No data for this period.</td></tr>';
+        }
+      } catch (err) {
+        console.warn('[AdTypeChart] failed:', err.message);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // GOALS TRACKER — added 2026-09-04 per Jaclyn. v1/mockup, framed
+      // explicitly as a first pass to react to, not a finished feature.
+      //
+      // Real data-structure findings from directly inspecting both real
+      // sheets before building this (not assumed):
+      //  - Column A is "MMM-YY" text (e.g. "Sep-26"), one row per MONTH,
+      //    not per day — this whole tracker reads ONE row per period,
+      //    not a range to sum.
+      //  - Column O ("Dollar Sales Goal") and AD ("Ads Sales Goal") are
+      //    confirmed real, consistently-used columns on both sheets.
+      //  - Column T is NOT what it looks like from the main header row
+      //    (blank there) — for most of this sheet's history it was a
+      //    free-text Notes column; only starting around Jun-26 did
+      //    someone repurpose it to hold real "Organic Goal" dollar
+      //    values, with a label placed directly on the Jun-26 row
+      //    itself rather than in the sheet's actual header row. Reading
+      //    older rows' column T as a goal number would silently read
+      //    garbled text instead — this only works reliably for the
+      //    recent months this tracker actually needs.
+      //  - Website's own AD column is confirmed BLANK for the last 3
+      //    months (Jul/Aug/Sep-26) — no separate Ads goal is currently
+      //    set for Website, Overall and Organic are identical. Handled
+      //    below by showing "No goal set" rather than a fake 0%.
+      //  - "Count all pending orders since this is live data" — the
+      //    rest of this page's Amazon aggregation (isValidAmazonRow)
+      //    excludes pending status. This tracker uses a separate
+      //    validity function that keeps pending, still excludes
+      //    cancelled and Vine. Walmart's and Website's EXISTING validity
+      //    functions already don't exclude pending at all — confirmed
+      //    by reading them directly rather than assuming — so no new
+      //    variant was needed for those two.
+      try {
+        function goalsIsValidAmazonRow(r) {
+          const status = (r.status || '').toLowerCase().trim();
+          if (status === 'cancelled') return false; // pending IS kept, deliberately
+          if ((r.promotion_ids || '').toLowerCase().includes('vine')) return false;
+          return true;
+        }
+        function parseGoalsDollar(val) {
+          const n = parseFloat(String(val || '').replace(/[$,()]/g, ''));
+          return isNaN(n) ? null : n;
+        }
+        function findGoalsRow(rows, year, month) {
+          const monthAbbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month - 1];
+          const target = `${monthAbbr}-${String(year).slice(2)}`;
+          return rows.find(r => (r[0] || '').trim() === target) || null;
+        }
+
+        const [goalsAmzCsv, goalsWebCsv] = await Promise.all([
+          fetch('https://docs.google.com/spreadsheets/d/1trsHDgVSLprsOOjOuFWGZRDqVOV-eII3/export?format=csv&gid=154860784' + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+          fetch('https://docs.google.com/spreadsheets/d/1trsHDgVSLprsOOjOuFWGZRDqVOV-eII3/export?format=csv&gid=1655791223' + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        ]);
+        const goalsAmzRows = parseCsv2D(goalsAmzCsv);
+        const goalsWebRows = parseCsv2D(goalsWebCsv);
+
+        const goalsRowAmz = findGoalsRow(goalsAmzRows, cfg.year, cfg.month);
+        const goalsRowWeb = findGoalsRow(goalsWebRows, cfg.year, cfg.month);
+        console.log('[GoalsTracker][qa] Amazon+Walmart goals row found:', !!goalsRowAmz, goalsRowAmz ? { overall: goalsRowAmz[14], organic: goalsRowAmz[19], ads: goalsRowAmz[29] } : null);
+        console.log('[GoalsTracker][qa] Website goals row found:', !!goalsRowWeb, goalsRowWeb ? { overall: goalsRowWeb[14], organic: goalsRowWeb[19], ads: goalsRowWeb[29] } : null);
+
+        // Live actual revenue, pending-inclusive, netted against returns
+        // (a returned sale shouldn't count toward a sales goal; a
+        // pending one should, since it hasn't been returned).
+        const amzGoalsActual = aggregateRange(amzRows, mtdStartStr, mtdEndStr, goalsIsValidAmazonRow).totalRevenue - amzReturnsMtd.totalAmt;
+        const wmtGoalsActual = wmtMtd.totalRevenue - wmtReturnsMtd.totalAmt; // wmtMtd already pending-inclusive, confirmed above
+        const webGoalsActual = webMtd.totalRevenue - webReturnsMtd.totalAmt; // webMtd already pending-inclusive, confirmed above
+        const amzWmtActual = amzGoalsActual + wmtGoalsActual;
+
+        // Amazon+Walmart's own Ad-attributed portion of amzWmtActual,
+        // reusing blendedSpend/blendedSales-style logic isn't available
+        // yet at this point in the function (computed further below) —
+        // approximated here from the same adOrdersCsv this function
+        // already has in scope, scoped to Amazon (Walmart's own ad-sales
+        // $ isn't separately available from wmtAdvRows at this point;
+        // flagged below rather than silently guessed).
+        let amzAdActual = null;
+        if (isCsv(adOrdersCsv)) {
+          const adRowsForGoals = parseCsv(adOrdersCsv).filter(r => parseInt(r.year, 10) === cfg.year && parseInt(r.month, 10) === cfg.month);
+          amzAdActual = adRowsForGoals.reduce((s, r) => s + parseAmt(r.sales), 0);
+        }
+        const amzOrganicActual = amzAdActual != null ? Math.max(0, amzWmtActual - amzAdActual) : null;
+
+        // Progress ring — plain SVG, deliberately not Chart.js. A single-
+        // value gauge like this doesn't need a charting library, and SVG
+        // sidesteps the whole canvas-reuse bug class entirely (already
+        // hit twice on this exact page — see the donut/trend chart fixes
+        // above) since it's DOM-based, not canvas-based, and just
+        // re-renders as a fresh string on every toggle click with
+        // nothing to destroy first.
+        // Sized up 2026-09-10 per Jaclyn (was looking small) — ring 96px
+        // -> 140px, all text bumped up a size.
+        function buildGaugeSvg(pct, colorHex) {
+          const size = 140, stroke = 14, r = (size - stroke) / 2, c = size / 2;
+          const circumference = 2 * Math.PI * r;
+          const clamped = Math.max(0, Math.min(100, pct));
+          const dashOffset = circumference * (1 - clamped / 100);
+          return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);">
+            <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${stroke}"/>
+            <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${colorHex}" stroke-width="${stroke}"
+              stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="butt"/>
+          </svg>`;
+        }
+
+        function renderGoalsGroup(actualOverall, actualAds, actualOrganic, goalRow) {
+          if (!goalRow) return `<div style="color:var(--muted);font-size:13px;flex:1;text-align:center;padding:20px;">No goals row found for this month.</div>`;
+          const overallGoal = parseGoalsDollar(goalRow[14]);
+          const organicGoal = parseGoalsDollar(goalRow[19]);
+          const adsGoal = parseGoalsDollar(goalRow[29]);
+          const fmtD = n => '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+          function paceGauge(sublabel, actual, goal) {
+            if (goal == null) {
+              return `<div style="text-align:center;flex:1;">
+                <div style="font-size:15px;color:var(--muted);font-weight:700;margin-bottom:8px;">${sublabel}</div>
+                ${buildGaugeSvg(0, 'var(--border)')}
+                <div style="font-size:13px;color:var(--muted);margin-top:8px;">No goal set</div>
+              </div>`;
+            }
+            if (actual == null) {
+              return `<div style="text-align:center;flex:1;">
+                <div style="font-size:15px;color:var(--muted);font-weight:700;margin-bottom:8px;">${sublabel}</div>
+                ${buildGaugeSvg(0, 'var(--border)')}
+                <div style="font-size:13px;color:var(--muted);margin-top:8px;">Not available yet</div>
+              </div>`;
+            }
+            // FIXED 2026-09-10 per Jaclyn — the ring's fill and center
+            // number now reflect ACTUAL progress against the goal
+            // (actual ÷ goal), which is what "the circles should be
+            // showing actual versus goal" means — real progress so far,
+            // not a full/maxed-out ring that hides how far along we
+            // actually are. The projection is used ONLY to decide the
+            // ring's color (on-pace vs not), completely separate from
+            // what the ring is filled to. Simplified to a clean binary
+            // green/red for both periods, matching "green if projecting
+            // to meet goal and red if projecting to miss goal" exactly
+            // — no amber middle state.
+            const actualPct = goal > 0 ? Math.round((actual / goal) * 100) : 0;
+            let projected = actual, statusText, statusColor;
+            if (cfg.isPartial) {
+              // MTD — project the full month from what we're averaging
+              // per day so far, to decide the color only.
+              const daysInMonth = new Date(cfg.year, cfg.month, 0).getDate();
+              projected = cfg.day > 0 ? (actual / cfg.day) * daysInMonth : actual;
+              const projectedPct = goal > 0 ? Math.round((projected / goal) * 100) : 0;
+              statusText = `Projecting ${fmtD(projected)}`;
+              statusColor = projectedPct >= 100 ? 'var(--green)' : 'var(--danger)';
+            } else {
+              // Last Full Month — the month is over, actual IS final, no separate projection.
+              statusText = actualPct >= 100 ? 'Hit goal' : 'Missed goal';
+              statusColor = actualPct >= 100 ? 'var(--green)' : 'var(--danger)';
+            }
+            return `<div style="text-align:center;flex:1;">
+              <div style="font-size:15px;color:var(--muted);font-weight:700;margin-bottom:8px;">${sublabel}</div>
+              <div style="position:relative;width:140px;height:140px;margin:0 auto;">
+                ${buildGaugeSvg(actualPct, statusColor)}
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:${statusColor};">${actualPct}%</div>
+              </div>
+              <div style="font-size:14px;color:var(--navy);font-weight:700;margin-top:8px;">${statusText}</div>
+              <div style="font-size:14px;color:var(--navy);font-weight:700;">Goal ${fmtD(goal)}</div>
+            </div>`;
+          }
+
+          return `<div style="display:flex;gap:16px;flex:1;">
+            ${paceGauge('Total Sales', actualOverall, overallGoal)}
+            ${paceGauge('Organic Sales', actualOrganic, organicGoal)}
+            ${paceGauge('Ad Sales', actualAds, adsGoal)}
+          </div>`;
+        }
+
+        const goalsBodyAmzEl = document.getElementById('ov-goals-body-amz');
+        const goalsBodyWebEl = document.getElementById('ov-goals-body-web');
+        if (goalsBodyAmzEl) goalsBodyAmzEl.innerHTML = renderGoalsGroup(amzWmtActual, amzAdActual, amzOrganicActual, goalsRowAmz);
+        if (goalsBodyWebEl) goalsBodyWebEl.innerHTML = renderGoalsGroup(webGoalsActual, null, webGoalsActual, goalsRowWeb);
+      } catch (err) {
+        console.warn('[GoalsTracker] failed:', err.message);
+        const goalsBodyAmzEl = document.getElementById('ov-goals-body-amz');
+        const goalsBodyWebEl = document.getElementById('ov-goals-body-web');
+        const failHtml = '<div style="color:var(--danger);flex:1;text-align:center;padding:20px;">Goals Tracker failed to load — check console.</div>';
+        if (goalsBodyAmzEl) goalsBodyAmzEl.innerHTML = failHtml;
+        if (goalsBodyWebEl) goalsBodyWebEl.innerHTML = failHtml;
+      }
+
+      // -- Ad Spend / Blended ACOS -- Amazon (prorated monthly estimate) + Website (real MTD) --
+      // Amazon: see file-level comment above this IIFE for why this isn't a
+      // true day-level MTD figure. MOM here compares this month's prorated
+      // estimate against LAST month's actual total prorated by the exact
+      // same day-fraction (days elapsed / days in that month) -- i.e. an
+      // apples-to-apples "estimated MTD vs estimated MTD one month back"
+      // comparison, built from monthly-only ad data instead of day-level
+      // order rows.
+      // Website: added 2026-08-05 per Jaclyn — Google Ads' "ads" tab is
+      // real day-level data, so no proration is needed on this side at
+      // all: webAdsMtd/webAdsPrevMtd (computed above) are already true,
+      // day-aligned MTD and prior-MTD sums. They're added directly to
+      // Amazon's prorated figures for one blended Ad Spend / ACOS number.
+      let proratedSpend = 0, proratedSales = 0, proratedSpendPrev = 0, proratedSalesPrev = 0;
+      if (isCsv(adOrdersCsv)) {
+        const adRows = parseCsv(adOrdersCsv);
+        if (cfg.isPartial) {
+          // MTD — unchanged from the original (only) behavior: estimate
+          // "this month so far" by prorating the LAST FULL month's real
+          // total by the exact day-fraction elapsed, then do the same one
+          // month further back, for a fair MTD-vs-MTD comparison built
+          // from monthly-only ad data.
+          let lm = refMonth, ly = refYear;
+          lm -= 1; if (lm === 0) { lm = 12; ly--; }
+          let lm2 = lm - 1, ly2 = ly;
+          if (lm2 === 0) { lm2 = 12; ly2--; }
+
+          const lastMonthAdRows = adRows.filter(r => parseInt(r.year, 10) === ly && parseInt(r.month, 10) === lm);
+          const twoMonthsAgoAdRows = adRows.filter(r => parseInt(r.year, 10) === ly2 && parseInt(r.month, 10) === lm2);
+
+          const lastMonthSpend = lastMonthAdRows.reduce((s, r) => s + parseAmt(r.spend), 0);
+          const lastMonthSales = lastMonthAdRows.reduce((s, r) => s + parseAmt(r.sales), 0);
+          const twoMonthsAgoSpend = twoMonthsAgoAdRows.reduce((s, r) => s + parseAmt(r.spend), 0);
+          const twoMonthsAgoSales = twoMonthsAgoAdRows.reduce((s, r) => s + parseAmt(r.sales), 0);
+
+          const daysInLastMonth = new Date(ly, lm, 0).getDate();
+          const daysInTwoMonthsAgo = new Date(ly2, lm2, 0).getDate();
+
+          proratedSpend = lastMonthSpend * (daysElapsed / daysInLastMonth);
+          proratedSales = lastMonthSales * (daysElapsed / daysInLastMonth);
+          proratedSpendPrev = twoMonthsAgoSpend * (daysElapsed / daysInTwoMonthsAgo);
+          proratedSalesPrev = twoMonthsAgoSales * (daysElapsed / daysInTwoMonthsAgo);
+        } else {
+          // ADDED 2026-08-28 per Jaclyn/Skinuva parity — Last Month: both
+          // the reference month and the one before it are already fully
+          // complete, so use each month's real total directly. No
+          // proration applies (or is needed) once a month is over — these
+          // vars keep the "prorated*" names below only so every
+          // downstream reference (blendedSpend, ACOS, etc.) didn't need
+          // touching.
+          const curAdRows = adRows.filter(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth);
+          const prevAdRows = adRows.filter(r => parseInt(r.year, 10) === lastMonthYear && parseInt(r.month, 10) === lastMonthNum);
+          proratedSpend = curAdRows.reduce((s, r) => s + parseAmt(r.spend), 0);
+          proratedSales = curAdRows.reduce((s, r) => s + parseAmt(r.sales), 0);
+          proratedSpendPrev = prevAdRows.reduce((s, r) => s + parseAmt(r.spend), 0);
+          proratedSalesPrev = prevAdRows.reduce((s, r) => s + parseAmt(r.sales), 0);
+        }
+      } else {
+        console.warn('[Evolis][overview] ad orders sheet did not return CSV — Ad Spend/ACOS will reflect Website only.');
+      }
+
+      // Walmart — added 2026-08-06 per Jaclyn. Reads SHEET_WALMART_ADVERTISING
+      // directly (evolis tab), which is ALREADY pre-aggregated at
+      // brand+month, unlike Amazon's ASIN-level Ad Orders sheet which
+      // needs summing across rows. Current month added directly (no
+      // proration) — Walmart's row already represents "the month so far"
+      // as of whenever the weekly Cowork pull last ran (Monday mornings),
+      // not a live daily figure the way Amazon's/Website's are. That
+      // means the blended total below is honestly a mix of live daily
+      // data (Amazon, Website) and a snapshot up to ~6 days stale
+      // (Walmart) — flagging rather than presenting all three as equally
+      // fresh.
+      let walmartSpendThisMonth = 0, walmartSalesThisMonth = 0, walmartSpendLastMonth = 0, walmartSalesLastMonth = 0;
+      try {
+        const walmartAdvCsv = await fetch(sheetCsvUrl(WALMART_ADVERTISING_SHEET_ID, WALMART_ADVERTISING_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => '');
+        if (isCsv(walmartAdvCsv)) {
+          const wmtAdvRows = parseCsv(walmartAdvCsv);
+          const wmtThisMonth = wmtAdvRows.find(r => parseInt(r.year, 10) === refYear && parseInt(r.month, 10) === refMonth);
+          const wmtLastMonth = wmtAdvRows.find(r => parseInt(r.year, 10) === lastMonthYear && parseInt(r.month, 10) === lastMonthNum);
+          if (wmtThisMonth) { walmartSpendThisMonth = parseAmt(wmtThisMonth.spend); walmartSalesThisMonth = parseAmt(wmtThisMonth.sales); }
+          if (wmtLastMonth) { walmartSpendLastMonth = parseAmt(wmtLastMonth.spend); walmartSalesLastMonth = parseAmt(wmtLastMonth.sales); }
+          console.log('[Evolis][overview] Walmart ad spend added — this month:', walmartSpendThisMonth, 'last month:', walmartSpendLastMonth);
+        }
+      } catch (e) { console.warn('[Evolis][overview] Walmart Advertising Cache lookup failed:', e.message); }
+
+      const blendedSpend = proratedSpend + webAdsMtd.spend + walmartSpendThisMonth;
+      const blendedSpendPrev = proratedSpendPrev + webAdsPrevMtd.spend + walmartSpendLastMonth;
+      const blendedSales = proratedSales + webAdsMtd.revenue + walmartSalesThisMonth;
+      const blendedSalesPrev = proratedSalesPrev + webAdsPrevMtd.revenue + walmartSalesLastMonth;
+      const acos = blendedSales > 0 ? (blendedSpend / blendedSales) * 100 : 0;
+      const acosPrev = blendedSalesPrev > 0 ? (blendedSpendPrev / blendedSalesPrev) * 100 : 0;
+
+      setKpi('ov-kpi-adspend', '$' + blendedSpend.toLocaleString(undefined, { maximumFractionDigits: 0 }), pctChange(blendedSpend, blendedSpendPrev), ovMomSuffix);
+      setKpi('ov-kpi-acos', acos.toFixed(1) + '%', pctChange(Math.round(acos * 10), Math.round(acosPrev * 10)), ovMomSuffix, true);
+
+      // ADDED 2026-08-28 per Jaclyn/Skinuva parity — MTD Ad Sales (same
+      // blended ad-attributed sales figure ACOS above is already built
+      // from — includes Website's webAdsMtd.revenue, matching évolis's
+      // own 3-channel blendedSales, unlike Skinuva's Amazon+Walmart-only
+      // version) and MTD Organic Sales (Total Sales — mtd.revenue,
+      // computed near the top of this function — minus Ad Sales, floored
+      // at 0, same pattern as the existing Organic Units card).
+      const organicSales = Math.max(0, mtd.revenue - blendedSales);
+      const organicSalesPrev = Math.max(0, prev.revenue - blendedSalesPrev);
+      setKpi('ov-kpi-ad-sales', '$' + blendedSales.toLocaleString(undefined, { maximumFractionDigits: 0 }), pctChange(blendedSales, blendedSalesPrev), ovMomSuffix);
+      setKpi('ov-kpi-organic-sales', '$' + organicSales.toLocaleString(undefined, { maximumFractionDigits: 0 }), pctChange(organicSales, organicSalesPrev), ovMomSuffix);
+
+      // -- Trend: trailing 6 COMPLETED months, blended revenue across channels --
+      // ROOT CAUSE of the blank chart: these revenue-history sheets use
+      // UPPERCASE positional headers (MONTH/YEAR/REVENUE), the same
+      // convention already confirmed working in buildRevenueChart() /
+      // buildWebChart() elsewhere in this file. My generic lowercase-keyed
+      // parseCsv() was looking up row.year/row.month/row.revenue against a
+      // sheet whose real keys are YEAR/MONTH/REVENUE -- every lookup
+      // silently returned undefined -> 0, so "no non-zero months" fired
+      // for the wrong reason. Parsing by column index now, matching the
+      // already-proven pattern exactly.
+      function parseRevenueHistory(csvText) {
+        if (!isCsv(csvText)) return [];
+        const lines = csvText.trim().split('\n');
+        if (lines.length < 2) return [];
+        const headers = parseCsvLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim().toUpperCase());
+        const monthIdx = headers.indexOf('MONTH');
+        const yearIdx = headers.indexOf('YEAR');
+        const revenueIdx = headers.indexOf('REVENUE');
+        if (monthIdx < 0 || yearIdx < 0 || revenueIdx < 0) {
+          console.warn('[Evolis][overview] revenue sheet missing MONTH/YEAR/REVENUE columns -- found:', headers);
+          return [];
+        }
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCsvLine(lines[i]);
+          const yr = parseInt((cols[yearIdx] || '').replace(/^"|"$/g, ''), 10);
+          const mo = parseInt((cols[monthIdx] || '').replace(/^"|"$/g, ''), 10);
+          const rev = parseAmt((cols[revenueIdx] || '').replace(/^"|"$/g, ''));
+          if (yr && mo >= 1 && mo <= 12) {
+            if (yr < 2015 || yr > 2035) {
+              console.warn('[revenue-history] implausible year', yr, 'for month', mo, '— skipping row (likely corrupted YEAR cell at the source). Revenue was:', rev);
+            } else {
+              rows.push({ year: yr, month: mo, revenue: rev });
+            }
+          }
+        }
+        return rows;
+      }
+
+      const [amzRevCsv, webRevCsv, wmtRevCsv] = await Promise.all([
+        fetch(sheetCsvUrl(AMZ_REVENUE_SHEET_ID, AMZ_REVENUE_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(WEB_SHEET_ID, WEB_REVENUE_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(sheetCsvUrl(WMT_REVENUE_SHEET_ID, WMT_REVENUE_GID) + `&_cb=${Date.now()}`).then(r => r.ok ? r.text() : '').catch(() => ''),
+      ]);
+      const amzRevRows = parseRevenueHistory(amzRevCsv);
+      const webRevRows = parseRevenueHistory(webRevCsv);
+      const wmtRevRows = parseRevenueHistory(wmtRevCsv);
+      console.log('[Evolis][overview] revenue-history row counts -- amazon:', amzRevRows.length, 'web:', webRevRows.length, 'walmart:', wmtRevRows.length);
+
+      function monthlyRevenue(rows, y, m) {
+        const row = rows.find(r => r.year === y && r.month === m);
+        return row ? row.revenue : 0;
+      }
+      const trendLabels = [], amzTrend = [], webTrend = [], wmtTrend = [];
+      let ty = now.getFullYear(), tm = now.getMonth();
+      for (let i = 0; i < 6; i++) {
+        tm -= 1; if (tm === 0) { tm = 12; ty--; }
+        trendLabels.unshift(`${monthNames[tm - 1]} '${String(ty).slice(2)}`);
+        amzTrend.unshift(monthlyRevenue(amzRevRows, ty, tm));
+        webTrend.unshift(monthlyRevenue(webRevRows, ty, tm));
+        wmtTrend.unshift(monthlyRevenue(wmtRevRows, ty, tm));
+      }
+      if ([...amzTrend, ...webTrend, ...wmtTrend].some(v => v > 0)) {
+        // FIXED 2026-09-01 — same canvas-reuse bug as the donut chart
+        // above, same root cause (this function can now run repeatedly
+        // on toggle clicks).
+        if (window._ovTrendChart) { window._ovTrendChart.destroy(); window._ovTrendChart = null; }
+        window._ovTrendChart = new Chart(document.getElementById('chart-ov-trend'), {
+          type: 'line',
+          data: {
+            labels: trendLabels,
+            datasets: [
+              { label: 'Amazon', data: amzTrend, borderColor: '#001f60', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3, tension: 0.3 },
+              { label: 'Website', data: webTrend, borderColor: '#24e9a3', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3, tension: 0.3 },
+              { label: 'Walmart', data: wmtTrend, borderColor: '#6b7ba2', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 3, tension: 0.3 },
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', align: 'start', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 24, padding: 12, font: { size: 13 }, generateLabels: bigLegendLabels } } },
+            scales: { y: { ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'K' } } }
+          }
+        });
+      } else {
+        console.warn('[Evolis][overview] no non-zero months found for trend chart — check revenue-history sheet gids (expects UPPERCASE columns: MONTH, YEAR, REVENUE).');
+      }
+    } catch (err) {
+      console.error('[Evolis][overview] fetch/parse failed:', err);
+    }
+  };
+
+})();
+
+</script>
+
+<script>
 // ── Brand data for Option A cards ──
+// ── Évolis Summary tab — ported verbatim from Évolis's own internal
+// Overview page (Goal Tracker, KPI rows, donut/trend/ad-type charts,
+// Top Selling Products table). Populated live by activateEvolisSummary()
+// below, which calls window.initOverviewLive() (defined in the ported
+// script block above) against whichever container it's inserted into.
+const EVOLIS_SUMMARY_HTML = `
+    <div class="sheet-link-menu">
+      <button class="sheet-link-btn" onclick="document.getElementById('overview-sheet-dropdown').classList.toggle('open')">🔗 Source Sheets <span style="font-size:9px;">▾</span></button>
+      <div class="sheet-link-dropdown" id="overview-sheet-dropdown">
+        <a href="https://docs.google.com/spreadsheets/d/1SiYu8e2-Pfi14Aiuf6SAFytWVXb4_dtdNFT6wvLFPok/edit?gid=1163928587#gid=1163928587" target="_blank" rel="noopener"><span class="sheet-link-icon">📦</span>Amazon Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/16mnFaFkTfXS4FzZ2mI5aoDKNrw8FWe8R8IUDnv3FHVs/edit?gid=267551179#gid=267551179" target="_blank" rel="noopener"><span class="sheet-link-icon">↩️</span>Amazon Returns</a>
+        <a href="https://docs.google.com/spreadsheets/d/1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI/edit?gid=158578426#gid=158578426" target="_blank" rel="noopener"><span class="sheet-link-icon">📣</span>Amazon Ad Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/1equxdiqpzonA5TgsrKzbrpq92QHyJP8kQ2RoUiYmank/edit?gid=1237377804#gid=1237377804" target="_blank" rel="noopener"><span class="sheet-link-icon">💰</span>Amazon Revenue</a>
+        <div style="border-top:1px solid var(--border2);margin:6px 4px;"></div>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=597852778#gid=597852778" target="_blank" rel="noopener"><span class="sheet-link-icon">🌐</span>Website Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=1033366681#gid=1033366681" target="_blank" rel="noopener"><span class="sheet-link-icon">↩️</span>Website Returns</a>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=7000599#gid=7000599" target="_blank" rel="noopener"><span class="sheet-link-icon">💰</span>Website Revenue</a>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=219707263#gid=219707263" target="_blank" rel="noopener"><span class="sheet-link-icon">📣</span>Website Google Ads</a>
+        <a href="https://docs.google.com/spreadsheets/d/1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw/edit?gid=1841786277#gid=1841786277" target="_blank" rel="noopener"><span class="sheet-link-icon">🛒</span>Website Shopping/PMAX</a>
+        <div style="border-top:1px solid var(--border2);margin:6px 4px;"></div>
+        <a href="https://docs.google.com/spreadsheets/d/1oIZDxN0vSf4nRvE_K95lsNyBWQd4Ef2aARm0RUtvE0Y/edit?gid=1844526926#gid=1844526926" target="_blank" rel="noopener"><span class="sheet-link-icon">📦</span>Walmart Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/1XxYmX0NT-4bqKh4N96zNAPIAzctXDQaK6Yzp6hVWjJc/edit?gid=344983459#gid=344983459" target="_blank" rel="noopener"><span class="sheet-link-icon">↩️</span>Walmart Returns</a>
+        <a href="https://docs.google.com/spreadsheets/d/1PYUPePnhnBJp77n3HVSKeM824ZorAMkiJC8WFbyORCU/edit?gid=664808652#gid=664808652" target="_blank" rel="noopener"><span class="sheet-link-icon">📣</span>Walmart Ad Orders</a>
+        <a href="https://docs.google.com/spreadsheets/d/1H1mAYxu8udO7vuCPGs8u0iVzHaRh0wbHb4PyIka4pUU/edit?gid=844750080#gid=844750080" target="_blank" rel="noopener"><span class="sheet-link-icon">📣</span>Walmart Advertising</a>
+        <a href="https://docs.google.com/spreadsheets/d/1QhKeOxKR0mEfSiM2pdYxrEBWsQdRSxbL8Q86MP6lpFE/edit?gid=812984298#gid=812984298" target="_blank" rel="noopener"><span class="sheet-link-icon">💰</span>Walmart Revenue</a>
+        <div style="border-top:1px solid var(--border2);margin:6px 4px;"></div>
+        <a href="https://docs.google.com/spreadsheets/d/1NNRTRQxQl2r4XivAvH700CC39p49GD2xfZlyRNqahGA/edit?gid=164358627#gid=164358627" target="_blank" rel="noopener"><span class="sheet-link-icon">🏷️</span>Master SKU List</a>
+      </div>
+    </div>
+    <div class="brand-hero">
+      <div class="brand-hero-left">
+        <div class="brand-name" style="font-family:var(--font-subheader);font-weight:700;font-size:28px;">évolis</div>
+        <div class="brand-tagline">Hair care · evolisproducts.com · Amazon · Walmart</div>
+      </div>
+      <div class="brand-hero-right">
+        <div class="hero-stat"><div class="hero-stat-val" id="ov-hero-revenue">$48.2K</div><div class="hero-stat-lbl" id="ov-hero-revenue-lbl">Month-to-Date Revenue</div></div>
+        <div class="hero-stat"><div class="hero-stat-val">3</div><div class="hero-stat-lbl">Channels</div></div>
+        <div class="hero-stat"><div class="hero-stat-val" id="ov-hero-skus">19</div><div class="hero-stat-lbl">Active SKUs (with Sales)</div></div>
+      </div>
+    </div>
+
+    <!-- MTD/Last Month toggle — added 2026-08-28 per Jaclyn, ported from
+         Skinuva's proven architecture (getOverviewPeriodConfig /
+         window.__overviewSelectPeriod / renderOverviewPeriodPills). -->
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-bottom:14px;">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);">Period</span>
+      <div class="period-pills" id="ov-period-pills" style="display:flex;background:var(--white);border:1px solid var(--border);border-radius:999px;padding:4px;gap:2px;"></div>
+    </div>
+
+    <!-- Goals Tracker — added 2026-09-04 per Jaclyn. First pass/mockup,
+         explicitly framed as v1 — see the [qa] console notes throughout
+         the JS for the real data-structure quirks found while building
+         this (mid-sheet column relabeling, Website's currently-blank
+         Ads goal for the last 3 months). Sand background + navy accent
+         border added 2026-09-10 per Jaclyn, to stand out from the plain
+         white cards around it — matches the same sand "featured content"
+         treatment already established elsewhere in this design system
+         (Executive Summary, Accomplished cards). Split into two separate
+         cards (Amazon+Walmart / Website) + sized up, also 2026-09-10.
+         Section title moved outside/above the cards, per-card titles
+         simplified to just the channel name (no "Goals Tracker —"
+         prefix, no MTD/Last Full Month suffix — that's redundant with
+         the page's own period toggle right above this section). Moved
+         above the KPI rows, 2026-09-11 per Jaclyn. -->
+    <div class="card-title" style="font-size:16px;">Goal Tracker</div>
+    <div class="two-col" style="margin-bottom:22px;align-items:stretch;">
+      <div class="card" id="ov-goals-card-amz" style="margin-top:0;background:var(--sand);border:none;border-top:3px solid var(--navy);">
+        <div class="card-title" id="ov-goals-title-amz" style="font-size:16px;">Amazon + Walmart</div>
+        <div id="ov-goals-body-amz" style="display:flex;gap:16px;">
+          <div style="color:var(--muted);flex:1;text-align:center;padding:20px;">Loading…</div>
+        </div>
+      </div>
+      <div class="card" id="ov-goals-card-web" style="margin-top:0;background:var(--sand);border:none;border-top:3px solid var(--navy);">
+        <div class="card-title" id="ov-goals-title-web" style="font-size:16px;">Website</div>
+        <div id="ov-goals-body-web" style="display:flex;gap:16px;">
+          <div style="color:var(--muted);flex:1;text-align:center;padding:20px;">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card" id="ov-kpi-total-sales"><div class="kpi-label">Total Sales</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-units"><div class="kpi-label">Total Units Sold</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-orders"><div class="kpi-label">Total Orders</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-aov"><div class="kpi-label">Blended AOV</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-adspend"><div class="kpi-label">Ad Spend</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-acos"><div class="kpi-label">Blended ACOS</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card" id="ov-kpi-organic-orders"><div class="kpi-label">MTD Organic Units</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-organic-sales"><div class="kpi-label">MTD Organic Sales</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-ad-orders"><div class="kpi-label">MTD Ad-Driven Units</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-ad-sales"><div class="kpi-label">MTD Ad Sales</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+      <div class="kpi-card" id="ov-kpi-pending"><div class="kpi-label">Pending Orders</div><div class="kpi-value">—</div><div class="kpi-mom flat">Loading…</div></div>
+    </div>
+
+    <div class="two-col" style="margin-bottom:22px;">
+      <div class="card" style="margin-top:0;">
+        <div class="card-title" id="ov-donut-title">Revenue by Channel — Month to Date</div>
+        <div style="position:relative;height:200px;"><canvas id="chart-ov-donut"></canvas></div>
+      </div>
+      <div class="card" style="margin-top:0;">
+        <div class="card-title">Monthly Revenue Trend</div>
+        <div style="position:relative;height:200px;"><canvas id="chart-ov-trend"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Ad Spend by Type (SP/SB/SD) — added 2026-09-11 per Jaclyn. Brand-
+         wide only (Amazon's ASIN-level ad orders data has no SP/SB/SD
+         split, confirmed by reading the real Ad Orders Cache sheet
+         directly before building this) — same breakdown reused
+         identically on the PPC page, since there's no per-product
+         version to build instead. Chart and table placed side by side,
+         2026-09-11 per Jaclyn — the screen is wide enough that stacking
+         them wasted horizontal space. -->
+    <div class="card" id="ov-ad-type-card" style="margin-bottom:20px;">
+      <div class="card-title" id="ov-ad-type-title">Ad Spend by Type — Month to Date</div>
+      <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
+        <div style="flex:0 0 280px;">
+          <div style="position:relative;height:200px;"><canvas id="chart-ov-ad-type"></canvas></div>
+          <div class="ppc-note" id="ov-ad-type-note" style="margin-top:10px;"></div>
+        </div>
+        <div style="flex:1;min-width:320px;overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Ad Type</th><th># Campaigns</th><th>ACOS</th><th>Spend</th><th>Sales</th></tr></thead>
+            <tbody id="ov-ad-type-tbody"><tr><td colspan="5" style="color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Top Selling Products <span style="font-weight:400;color:var(--muted);">(by Units, all channels, Month to Date)</span></div>
+      <table class="tp-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:var(--navy);color:#fff;">
+            <th style="text-align:left;padding:8px 10px;">#</th>
+            <th style="text-align:left;padding:8px 10px;">Product</th>
+            <th style="text-align:left;padding:8px 10px;">Amazon</th>
+            <th style="text-align:left;padding:8px 10px;">Website</th>
+            <th style="text-align:left;padding:8px 10px;">Walmart</th>
+            <th style="text-align:left;padding:8px 10px;">Total Units</th>
+            <th style="text-align:left;padding:8px 10px;">Ads (Amazon)</th>
+            <th style="text-align:left;padding:8px 10px;">Organic</th>
+            <th style="text-align:left;padding:8px 10px;">Conv% (Amazon)</th>
+          </tr>
+        </thead>
+        <tbody id="ov-products-tbody"><tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted);">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+`;
+
+// Injects the ported Évolis Overview markup into a container and (re)runs
+// the live data loader against it. Resets _overviewLiveInit so switching
+// away and back — or between Option A and Option B — always repopulates
+// the freshly-inserted DOM rather than silently no-op'ing on the guard
+// that skips a redundant fetch for an already-loaded period.
+function activateEvolisSummary(containerEl) {
+  if (!containerEl) return;
+  containerEl.innerHTML = EVOLIS_SUMMARY_HTML;
+  window._overviewLiveInit = null;
+  if (typeof window.initOverviewLive === 'function') {
+    window.initOverviewLive(window._overviewActivePeriod);
+  }
+}
+
 const brandData = {
   evolis: {
     name:'Évolis Professional', meta:'Hair care · Amazon · Website · Walmart · May 2026', url:'https://evolis.medaltus.com/',
@@ -715,7 +2309,11 @@ function selectBrandA(btn, name, id, url) {
   document.getElementById('a-brand-name').textContent = name;
   currentUrlA = url;
   currentNameA = name;
-  document.getElementById('a-cards-content').innerHTML = renderCards(id);
+  if (id === 'evolis') {
+    activateEvolisSummary(document.getElementById('a-cards-content'));
+  } else {
+    document.getElementById('a-cards-content').innerHTML = renderCards(id);
+  }
   renderIframeA(url, name);
   setViewA(currentViewA);
 }
@@ -783,7 +2381,7 @@ function setViewA(mode) {
 }
 
 // Initialise A with evolis
-document.getElementById('a-cards-content').innerHTML = renderCards('evolis');
+activateEvolisSummary(document.getElementById('a-cards-content'));
 renderIframeA(currentUrlA, currentNameA);
 
 // ── Option B logic ──
@@ -793,6 +2391,12 @@ function selectBrandB(id, btn) {
   const view = document.getElementById('bv-' + id);
   if (view) view.classList.add('active');
   if (btn) btn.classList.add('active');
+  // Lazy-load: only populate once actually shown, so Chart.js never sizes
+  // its canvases against a hidden (0×0) container.
+  if (id === 'evolis') {
+    const container = document.getElementById('b-evolis-cards');
+    if (container && !container.hasChildNodes()) activateEvolisSummary(container);
+  }
 }
 
 function setBViewMode(brandId, mode) {
