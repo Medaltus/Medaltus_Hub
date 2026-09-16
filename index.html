@@ -284,19 +284,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <button class="brand-item" onclick="selectBrandA(this,'dearcloud','dearcloud','#')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">dearcloud</div><div class="bi-sub">Skincare</div></div>
         </button>
-        <button class="brand-item" onclick="selectBrandA(this,'The Crème Shop','cremeshop','#')">
+        <button class="brand-item" onclick="selectBrandA(this,'The Crème Shop','cremeshop','https://thecremeshop.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">The Crème Shop</div><div class="bi-sub">Beauty</div></div>
         </button>
-        <button class="brand-item" onclick="selectBrandA(this,'Cloud Cafe','cloudcafe','#')">
+        <button class="brand-item" onclick="selectBrandA(this,'Cloud Cafe','cloudcafe','https://cloudcafe.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Cloud Cafe</div><div class="bi-sub">Wellness</div></div>
         </button>
-        <button class="brand-item" onclick="selectBrandA(this,'MiGuard','miguard','#')">
+        <button class="brand-item" onclick="selectBrandA(this,'MiGuard','miguard','https://miguard.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">MiGuard</div><div class="bi-sub">Supplements</div></div>
         </button>
         <button class="brand-item" onclick="selectBrandA(this,'Hillside','hillside','#')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Hillside</div><div class="bi-sub">Wellness</div></div>
         </button>
-        <button class="brand-item" onclick="selectBrandA(this,'Just Bjorn','justbjorn','#')">
+        <button class="brand-item" onclick="selectBrandA(this,'Just Bjorn','justbjorn','https://justbjorn.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Just Bjorn</div><div class="bi-sub">Personal care</div></div>
         </button>
         <button class="brand-item" onclick="selectBrandA(this,'Prohibition','prohibition','#')">
@@ -305,7 +305,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <button class="brand-item" onclick="selectBrandA(this,'Eraclea','eraclea','#')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Eraclea</div><div class="bi-sub">Skincare</div></div>
         </button>
-        <button class="brand-item" onclick="selectBrandA(this,'skinside SEOUL','skinseoul','#')">
+        <button class="brand-item" onclick="selectBrandA(this,'skinside SEOUL','skinseoul','https://skinside.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">skinside SEOUL</div><div class="bi-sub">K-beauty</div></div>
         </button>
         <button class="brand-item" onclick="selectBrandA(this,'PB & Jay','pbjay','#')">
@@ -386,6 +386,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <button class="brand-tab" onclick="selectBrandB('collagelee',this)"><div class="brand-tab-dot building"></div>Collagelee</button>
       <div class="bt-sep"></div>
       <button class="brand-tab" onclick="selectBrandB('cosmette',this)"><div class="brand-tab-dot live"></div>Cosmette Skincare</button>
+      <button class="brand-tab" onclick="selectBrandB('justbjorn',this)"><div class="brand-tab-dot live"></div>Just Bjorn</button>
+      <button class="brand-tab" onclick="selectBrandB('skinseoul',this)"><div class="brand-tab-dot live"></div>skinside SEOUL</button>
     </div>
 
     <!-- Content area -->
@@ -513,11 +515,68 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         </div>
       </div>
       <div class="brand-view" id="bv-dearcloud"><div class="b-view-bar"><div><div class="b-view-title">dearcloud</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
-      <div class="brand-view" id="bv-cremeshop"><div class="b-view-bar"><div><div class="b-view-title">The Crème Shop</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
-      <div class="brand-view" id="bv-cloudcafe"><div class="b-view-bar"><div><div class="b-view-title">Cloud Cafe</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
+      <div class="brand-view" id="bv-cremeshop">
+        <div class="b-view-bar">
+          <div><div class="b-view-title">The Crème Shop</div><div class="b-view-meta">Beauty · Live dashboard</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-cremeshop-cards-btn" onclick="setBViewMode('cremeshop','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-cremeshop-dash-btn" onclick="setBViewMode('cremeshop','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://thecremeshop.medaltus.com/','_blank')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-cremeshop-cards"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard is live. Click Full Dashboard to view real-time data.</div></div></div></div>
+        <div class="b-iframe-panel" id="b-cremeshop-dash">
+          <iframe src="https://thecremeshop.medaltus.com/" title="The Crème Shop — Full Dashboard"></iframe>
+        </div>
+      </div>
+      <div class="brand-view" id="bv-cloudcafe">
+        <div class="b-view-bar">
+          <div><div class="b-view-title">Cloud Cafe</div><div class="b-view-meta">Wellness · Live dashboard</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-cloudcafe-cards-btn" onclick="setBViewMode('cloudcafe','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-cloudcafe-dash-btn" onclick="setBViewMode('cloudcafe','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://cloudcafe.medaltus.com/','_blank')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-cloudcafe-cards"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard is live. Click Full Dashboard to view real-time data.</div></div></div></div>
+        <div class="b-iframe-panel" id="b-cloudcafe-dash">
+          <iframe src="https://cloudcafe.medaltus.com/" title="Cloud Cafe — Full Dashboard"></iframe>
+        </div>
+      </div>
       <div class="brand-view" id="bv-miguard">
-        <div class="b-view-bar"><div><div class="b-view-title">MiGuard</div><div class="b-view-meta">Supplements · Amazon · May 2026</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div>
-        <div class="b-cards-scroll"><div class="kpi-strip"><div class="ks-card"><div class="ks-lbl">Units</div><div class="ks-val">89</div><div class="ks-mom up">▲ 22% MOM</div></div><div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$3.5K</div><div class="ks-mom up">▲ 20% MOM</div></div></div></div>
+        <div class="b-view-bar">
+          <div><div class="b-view-title">MiGuard</div><div class="b-view-meta">Supplements · Amazon · May 2026</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-miguard-cards-btn" onclick="setBViewMode('miguard','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-miguard-dash-btn" onclick="setBViewMode('miguard','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://miguard.medaltus.com/','_blank')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-miguard-cards"><div class="kpi-strip"><div class="ks-card"><div class="ks-lbl">Units</div><div class="ks-val">89</div><div class="ks-mom up">▲ 22% MOM</div></div><div class="ks-card"><div class="ks-lbl">Revenue</div><div class="ks-val sm">$3.5K</div><div class="ks-mom up">▲ 20% MOM</div></div></div></div>
+        <div class="b-iframe-panel" id="b-miguard-dash">
+          <iframe src="https://miguard.medaltus.com/" title="MiGuard — Full Dashboard"></iframe>
+        </div>
       </div>
       <div class="brand-view" id="bv-hillside"><div class="b-view-bar"><div><div class="b-view-title">Hillside</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live</div></div></div></div></div>
       <div class="brand-view" id="bv-vbc">
@@ -564,6 +623,48 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       </div>
       <div class="brand-view" id="bv-amala"><div class="b-view-bar"><div><div class="b-view-title">Amala</div></div></div><div class="b-cards-scroll"><div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">Amala's dashboard is being built. Data sources connecting soon.</div><div class="bs-badge">Launching Soon</div></div></div></div>
       <div class="brand-view" id="bv-collagelee"><div class="b-view-bar"><div><div class="b-view-title">Collagelee</div></div></div><div class="b-cards-scroll"><div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">Collagelee's dashboard is being built.</div><div class="bs-badge">Launching Soon</div></div></div></div>
+      <div class="brand-view" id="bv-justbjorn">
+        <div class="b-view-bar">
+          <div><div class="b-view-title">Just Bjorn</div><div class="b-view-meta">Personal care · Live dashboard</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-justbjorn-cards-btn" onclick="setBViewMode('justbjorn','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-justbjorn-dash-btn" onclick="setBViewMode('justbjorn','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://justbjorn.medaltus.com/','_blank')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-justbjorn-cards"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard is live. Click Full Dashboard to view real-time data.</div></div></div></div>
+        <div class="b-iframe-panel" id="b-justbjorn-dash">
+          <iframe src="https://justbjorn.medaltus.com/" title="Just Bjorn — Full Dashboard"></iframe>
+        </div>
+      </div>
+      <div class="brand-view" id="bv-skinseoul">
+        <div class="b-view-bar">
+          <div><div class="b-view-title">skinside SEOUL</div><div class="b-view-meta">K-beauty · Live dashboard</div></div>
+          <div class="b-view-right">
+            <div class="view-toggle">
+              <button class="vt-btn active" id="b-skinseoul-cards-btn" onclick="setBViewMode('skinseoul','cards')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Summary
+              </button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn" id="b-skinseoul-dash-btn" onclick="setBViewMode('skinseoul','dash')">
+                <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 5h14M5 5v9"/></svg>Full Dashboard
+              </button>
+            </div>
+            <button class="cbar-btn cbar-btn-primary" onclick="window.open('https://skinside.medaltus.com/','_blank')">↗ New Tab</button>
+          </div>
+        </div>
+        <div class="b-cards-scroll" id="b-skinseoul-cards"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard is live. Click Full Dashboard to view real-time data.</div></div></div></div>
+        <div class="b-iframe-panel" id="b-skinseoul-dash">
+          <iframe src="https://skinside.medaltus.com/" title="skinside SEOUL — Full Dashboard"></iframe>
+        </div>
+      </div>
 
     </div><!-- /b-content-area -->
   </div><!-- /opt-b-body -->
