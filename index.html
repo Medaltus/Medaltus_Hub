@@ -268,9 +268,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <button class="brand-item" onclick="selectBrandA(this,'Cosmette Skincare','cosmette','https://cosmetteskincare.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Cosmette Skincare</div><div class="bi-sub">Skincare</div></div>
         </button>
-        <button class="brand-item" onclick="selectBrandA(this,'dearcloud','dearcloud','#')">
-          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">dearcloud</div><div class="bi-sub">Skincare</div></div>
-        </button>
         <button class="brand-item" onclick="selectBrandA(this,'The Crème Shop','cremeshop','https://thecremeshop.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">The Crème Shop</div><div class="bi-sub">Beauty</div></div>
         </button>
@@ -279,9 +276,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         </button>
         <button class="brand-item" onclick="selectBrandA(this,'MiGuard','miguard','https://miguard.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">MiGuard</div><div class="bi-sub">Supplements</div></div>
-        </button>
-        <button class="brand-item" onclick="selectBrandA(this,'Hillside','hillside','#')">
-          <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Hillside</div><div class="bi-sub">Wellness</div></div>
         </button>
         <button class="brand-item" onclick="selectBrandA(this,'Just Bjorn','justbjorn','https://justbjorn.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Just Bjorn</div><div class="bi-sub">Personal care</div></div>
@@ -305,12 +299,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         <div class="bs-section">Building Soon</div>
         <button class="brand-item" onclick="selectBrandA(this,'Amala','amala','#')">
           <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Amala</div><div class="bi-sub">Skincare — launching</div></div>
-        </button>
-        <button class="brand-item" onclick="selectBrandA(this,'Collagelee','collagelee','#')">
-          <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Collagelee</div><div class="bi-sub">Supplements — launching</div></div>
-        </button>
-        <button class="brand-item" onclick="selectBrandA(this,'Cimeosil','cimeosil','#')">
-          <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">Cimeosil</div><div class="bi-sub">Medical — separate account</div></div>
         </button>
       </div>
     </div>
@@ -363,14 +351,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div class="bt-sep"></div>
       <button class="brand-tab" onclick="selectBrandB('evolis',this)"><div class="brand-tab-dot live"></div>Évolis</button>
       <button class="brand-tab" onclick="selectBrandB('skinuva',this)"><div class="brand-tab-dot live"></div>Skinuva</button>
-      <button class="brand-tab" onclick="selectBrandB('dearcloud',this)"><div class="brand-tab-dot live"></div>dearcloud</button>
       <button class="brand-tab" onclick="selectBrandB('cremeshop',this)"><div class="brand-tab-dot live"></div>The Crème Shop</button>
       <button class="brand-tab" onclick="selectBrandB('cloudcafe',this)"><div class="brand-tab-dot live"></div>Cloud Cafe</button>
       <button class="brand-tab" onclick="selectBrandB('miguard',this)"><div class="brand-tab-dot live"></div>MiGuard</button>
-      <button class="brand-tab" onclick="selectBrandB('hillside',this)"><div class="brand-tab-dot live"></div>Hillside</button>
       <button class="brand-tab" onclick="selectBrandB('vbc',this)"><div class="brand-tab-dot live"></div>VB Cosmetics</button>
       <button class="brand-tab" onclick="selectBrandB('amala',this)"><div class="brand-tab-dot building"></div>Amala</button>
-      <button class="brand-tab" onclick="selectBrandB('collagelee',this)"><div class="brand-tab-dot building"></div>Collagelee</button>
       <div class="bt-sep"></div>
       <button class="brand-tab" onclick="selectBrandB('cosmette',this)"><div class="brand-tab-dot live"></div>Cosmette Skincare</button>
       <button class="brand-tab" onclick="selectBrandB('justbjorn',this)"><div class="brand-tab-dot live"></div>Just Bjorn</button>
@@ -383,7 +368,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <!-- All brands view -->
       <div class="brand-view active" id="bv-all">
         <div class="b-view-bar">
-          <div><div class="b-view-title">All Brands</div><div class="b-view-meta">18 brands · 15 live · 3 building · May 2026</div></div>
+          <div><div class="b-view-title">All Brands</div><div class="b-view-meta">14 brands · 13 live · 1 building · May 2026</div></div>
         </div>
         <div class="b-cards-scroll">
           <div class="all-grid">
@@ -414,7 +399,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
               </div>
               <div class="bc-ft"><div class="bc-pills"><span class="bc-pill">Amazon</span></div><span class="bc-arrow">→</span></div>
             </div>
-            <div class="bc" onclick="selectBrandB('vbc',document.querySelector('.brand-tab:nth-child(10)'))">
+            <div class="bc" onclick="selectBrandB('vbc',document.querySelector('.brand-tab:nth-child(8)'))">
               <div class="bc-hd"><div class="bc-name">VB Cosmetics</div><div class="bc-status st-live">● Live</div></div>
               <div class="bc-stats">
                 <div><div class="bc-stat-v">—</div><div class="bc-stat-l">Units</div></div>
@@ -423,12 +408,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
               </div>
               <div class="bc-ft"><div class="bc-pills"><span class="bc-pill">Amazon</span></div><span class="bc-arrow">→</span></div>
             </div>
-            <div class="bc" onclick="selectBrandB('amala',document.querySelector('.brand-tab:nth-child(11)'))">
+            <div class="bc" onclick="selectBrandB('amala',document.querySelector('.brand-tab:nth-child(9)'))">
               <div class="bc-hd"><div class="bc-name">Amala</div><div class="bc-status st-building">◌ Building</div></div>
               <div style="padding:12px 0;"><div class="bs-badge" style="font-size:10px;padding:3px 10px;">⚙ Dashboard in progress</div></div>
               <div class="bc-ft"><div class="bc-pills"></div><span class="bc-arrow">→</span></div>
             </div>
-            <div class="bc" onclick="selectBrandB('cosmette',document.querySelector('.brand-tab:nth-child(14)'))">
+            <div class="bc" onclick="selectBrandB('cosmette',document.querySelector('.brand-tab:nth-child(11)'))">
               <div class="bc-hd"><div class="bc-name">Cosmette Skincare</div><div class="bc-status st-live">● Live</div></div>
               <div style="padding:12px 0 6px;font-size:11px;color:var(--muted);">Full dashboard live — click through for real-time data</div>
               <div class="bc-ft"><div class="bc-pills"><span class="bc-pill">Amazon</span></div><span class="bc-arrow">→</span></div>
@@ -501,7 +486,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           <iframe src="https://skinuva.medaltus.com/" title="Skinuva — Full Internal Dashboard"></iframe>
         </div>
       </div>
-      <div class="brand-view" id="bv-dearcloud"><div class="b-view-bar"><div><div class="b-view-title">dearcloud</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live — click New Tab to view</div></div></div></div></div>
       <div class="brand-view" id="bv-cremeshop">
         <div class="b-view-bar">
           <div><div class="b-view-title">The Crème Shop</div><div class="b-view-meta">Beauty · Live dashboard</div></div>
@@ -565,7 +549,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           <iframe src="https://miguard.medaltus.com/" title="MiGuard — Full Dashboard"></iframe>
         </div>
       </div>
-      <div class="brand-view" id="bv-hillside"><div class="b-view-bar"><div><div class="b-view-title">Hillside</div></div><div class="b-view-right"><button class="cbar-btn cbar-btn-primary">↗ New Tab</button></div></div><div class="b-cards-scroll"><div class="flags-card"><div class="flags-title">Status</div><div class="flag-row"><div class="flag-dot ok"></div><div class="flag-text">Dashboard live</div></div></div></div></div>
       <div class="brand-view" id="bv-vbc">
         <div class="b-view-bar">
           <div><div class="b-view-title">VB Cosmetics</div><div class="b-view-meta">Beauty · Amazon · VBC Seller Account</div></div>
@@ -609,7 +592,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
         </div>
       </div>
       <div class="brand-view" id="bv-amala"><div class="b-view-bar"><div><div class="b-view-title">Amala</div></div></div><div class="b-cards-scroll"><div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">Amala's dashboard is being built. Data sources connecting soon.</div><div class="bs-badge">Launching Soon</div></div></div></div>
-      <div class="brand-view" id="bv-collagelee"><div class="b-view-bar"><div><div class="b-view-title">Collagelee</div></div></div><div class="b-cards-scroll"><div class="building-state"><div class="bs-icon">⚙️</div><div class="bs-title">Dashboard in Progress</div><div class="bs-sub">Collagelee's dashboard is being built.</div><div class="bs-badge">Launching Soon</div></div></div></div>
       <div class="brand-view" id="bv-justbjorn">
         <div class="b-view-bar">
           <div><div class="b-view-title">Just Bjorn</div><div class="b-view-meta">Personal care · Live dashboard</div></div>
@@ -691,7 +673,7 @@ const brandData = {
     flags:[{t:'w',x:'This dashboard is currently being built. Check back soon.',tag:'Building'}]
   }
 };
-const buildingBrands = ['amala','collagelee','cimeosil'];
+const buildingBrands = ['amala'];
 
 function getBrandData(id) {
   if (buildingBrands.includes(id)) return brandData.building;
