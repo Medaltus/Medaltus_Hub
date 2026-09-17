@@ -299,8 +299,9 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view{
   --navy:#0f1e3d; --cream:#ecd7b3; --green:#24E9A3; --danger:#db372d;
   --border:#dde2ec; --bg:#f4f5f7; --ink:#14213d; --muted:#6b7280;
-  overflow-y:auto; background:var(--bg); color:var(--ink);
+  display:none; flex:1; overflow-y:auto; background:var(--bg); color:var(--ink);
 }
+#goal-tracker-view.active{ display:block; }
 #goal-tracker-view .gt-wrap{ padding:20px 24px 40px; max-width:1600px; margin:0 auto; }
 #goal-tracker-view .gt-manager-block{ margin-bottom:16px; }
 #goal-tracker-view .gt-manager-title{
@@ -381,106 +382,6 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 </div>
 
 <!-- ══════════════════════════════════════
-     OVERVIEW — ALL BRANDS (Goal Tracker)
-══════════════════════════════════════ -->
-<div class="option-view" id="goal-tracker-view">
-<div class="gt-wrap">
-
-  <div class="gt-manager-block">
-    <div class="gt-manager-title">Brand Manager: <span>Isabella</span></div>
-    <div class="gt-grid">
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">Skinuva</div><div class="gt-chan">Amazon + Walmart</div></div>
-        <div class="gt-group">
-          <div class="gt-group-label">Amazon + Walmart</div>
-          <div class="gt-rings" id="r-skinuva"></div>
-        </div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">eraclea</div><div class="gt-chan">Amazon</div></div>
-        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-eraclea"></div></div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">Cosmette Skincare</div><div class="gt-chan">Amazon</div></div>
-        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-cosmette"></div></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="gt-manager-block">
-    <div class="gt-manager-title">Brand Manager: <span>Lindsay</span></div>
-    <div class="gt-grid">
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">Cloud Cafe</div><div class="gt-chan">Amazon + Walmart</div></div>
-        <div class="gt-group">
-          <div class="gt-group-label">Amazon + Walmart</div>
-          <div class="gt-rings" id="r-cloudcafe"></div>
-        </div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">Just Björn</div><div class="gt-chan">Amazon + Walmart</div></div>
-        <div class="gt-group"><div class="gt-group-label">Amazon + Walmart</div><div class="gt-rings" id="r-justbjorn"></div></div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">Amala</div><div class="gt-chan">Amazon</div></div>
-        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-amala"></div></div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">High On Love</div><div class="gt-chan">Amazon</div></div>
-        <div class="gt-placeholder">
-          <b>No actuals source found</b>
-          Not present in the Newderm orders cache (no gid on the SHEET_ORDERS tab) — confirm seller account with Lindsay.
-        </div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">The Crème Shop</div><div class="gt-chan">Amazon</div></div>
-        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-cremeshop"></div></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="gt-manager-block">
-    <div class="gt-manager-title">Brand Manager: <span>Jaclyn</span></div>
-    <div class="gt-grid">
-      <div class="gt-card gt-wide">
-        <div class="gt-card-head"><div class="gt-name">évolis</div><div class="gt-chan">Amazon + Walmart · Website</div></div>
-        <div class="gt-groups-row">
-          <div class="gt-group">
-            <div class="gt-group-label">Amazon + Walmart</div>
-            <div class="gt-rings" id="r-evolis-aw"></div>
-          </div>
-          <div class="gt-group">
-            <div class="gt-group-label">Website</div>
-            <div class="gt-rings" id="r-evolis-web"></div>
-          </div>
-        </div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">skinside SEOUL</div><div class="gt-chan">Amazon</div></div>
-        <div class="gt-group">
-          <div class="gt-group-label">Amazon</div>
-          <div class="gt-rings" id="r-skinside"></div>
-        </div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">MiGuard</div><div class="gt-chan">Amazon</div></div>
-        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-miguard"></div></div>
-      </div>
-      <div class="gt-card">
-        <div class="gt-card-head"><div class="gt-name">PB &amp; Jay</div><div class="gt-chan">Amazon + Walmart</div></div>
-        <div class="gt-group"><div class="gt-group-label">Amazon + Walmart</div><div class="gt-rings" id="r-pbj"></div></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="gt-footnote">
-    <p>Ring fill = actual ÷ goal. Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. for X% avg. cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps.</p>
-  </div>
-
-</div>
-</div>
-
-<!-- ══════════════════════════════════════
      OPTION A — Sidebar + Content Area
 ══════════════════════════════════════ -->
 <div class="option-view active" id="opt-a">
@@ -537,6 +438,106 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
           <div class="brand-dot building"></div><div class="bi-info"><div class="bi-name">PB & Jay</div><div class="bi-sub">Snacks — launching</div></div>
         </button>
       </div>
+    </div>
+
+    <!-- Overview — All Brands (Goal Tracker). Sibling of .brand-content,
+         not a separate top-level page, so the sidebar never disappears —
+         only this pane and .brand-content trade places. -->
+    <div class="gt-page" id="goal-tracker-view">
+    <div class="gt-wrap">
+
+      <div class="gt-manager-block">
+        <div class="gt-manager-title">Brand Manager: <span>Isabella</span></div>
+        <div class="gt-grid">
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">Skinuva</div><div class="gt-chan">Amazon + Walmart</div></div>
+            <div class="gt-group">
+              <div class="gt-group-label">Amazon + Walmart</div>
+              <div class="gt-rings" id="r-skinuva"></div>
+            </div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">eraclea</div><div class="gt-chan">Amazon</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-eraclea"></div></div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">Cosmette Skincare</div><div class="gt-chan">Amazon</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-cosmette"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gt-manager-block">
+        <div class="gt-manager-title">Brand Manager: <span>Lindsay</span></div>
+        <div class="gt-grid">
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">Cloud Cafe</div><div class="gt-chan">Amazon + Walmart</div></div>
+            <div class="gt-group">
+              <div class="gt-group-label">Amazon + Walmart</div>
+              <div class="gt-rings" id="r-cloudcafe"></div>
+            </div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">Just Björn</div><div class="gt-chan">Amazon + Walmart</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon + Walmart</div><div class="gt-rings" id="r-justbjorn"></div></div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">Amala</div><div class="gt-chan">Amazon</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-amala"></div></div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">High On Love</div><div class="gt-chan">Amazon</div></div>
+            <div class="gt-placeholder">
+              <b>No actuals source found</b>
+              Not present in the Newderm orders cache (no gid on the SHEET_ORDERS tab) — confirm seller account with Lindsay.
+            </div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">The Crème Shop</div><div class="gt-chan">Amazon</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-cremeshop"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gt-manager-block">
+        <div class="gt-manager-title">Brand Manager: <span>Jaclyn</span></div>
+        <div class="gt-grid">
+          <div class="gt-card gt-wide">
+            <div class="gt-card-head"><div class="gt-name">évolis</div><div class="gt-chan">Amazon + Walmart · Website</div></div>
+            <div class="gt-groups-row">
+              <div class="gt-group">
+                <div class="gt-group-label">Amazon + Walmart</div>
+                <div class="gt-rings" id="r-evolis-aw"></div>
+              </div>
+              <div class="gt-group">
+                <div class="gt-group-label">Website</div>
+                <div class="gt-rings" id="r-evolis-web"></div>
+              </div>
+            </div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">skinside SEOUL</div><div class="gt-chan">Amazon</div></div>
+            <div class="gt-group">
+              <div class="gt-group-label">Amazon</div>
+              <div class="gt-rings" id="r-skinside"></div>
+            </div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">MiGuard</div><div class="gt-chan">Amazon</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-miguard"></div></div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">PB &amp; Jay</div><div class="gt-chan">Amazon + Walmart</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon + Walmart</div><div class="gt-rings" id="r-pbj"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gt-footnote">
+        <p>Ring fill = actual ÷ goal. Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. for X% avg. cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps.</p>
+      </div>
+
+    </div>
     </div>
 
     <!-- Content area -->
@@ -4453,14 +4454,14 @@ let currentNameA = 'Évolis';
 
 function showOverview(btn) {
   document.querySelectorAll('#opt-a .brand-item').forEach(b => b.classList.remove('active'));
-  document.getElementById('opt-a').classList.remove('active');
+  document.querySelector('#opt-a .brand-content').style.display = 'none';
   document.getElementById('goal-tracker-view').classList.add('active');
   if (btn) btn.classList.add('active');
 }
 
 function selectBrandA(btn, name, id, url) {
   document.getElementById('goal-tracker-view').classList.remove('active');
-  document.getElementById('opt-a').classList.add('active');
+  document.querySelector('#opt-a .brand-content').style.display = '';
   document.getElementById('nav-overview-btn').classList.remove('active');
   document.querySelectorAll('#opt-a .brand-item').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
