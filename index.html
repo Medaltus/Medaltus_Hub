@@ -89,6 +89,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .brand-dot{width:7px;height:7px;border-radius:50%;background:var(--silver);flex-shrink:0;}
 .brand-dot.live{background:var(--success);}
 .brand-dot.building{background:var(--warn);}
+.nav-overview-btn{display:flex;align-items:center;gap:9px;width:calc(100% - 16px);margin:10px 8px 4px;padding:9px 12px;border:none;border-radius:var(--radius-sm);background:var(--navy);color:#fff;font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer;transition:all .12s;}
+.nav-overview-btn:hover{background:#0a2a78;}
+.nav-overview-btn.active{background:var(--green);color:var(--navy);}
+.nav-overview-btn svg{width:14px;height:14px;flex-shrink:0;}
 .bi-info{flex:1;min-width:0;}
 .bi-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;}
 .bi-sub{font-size:10px;color:var(--muted);margin-top:1px;}
@@ -281,6 +285,79 @@ table.data-table tbody tr{border-bottom:1px solid var(--border2);}
 table.data-table tbody tr:nth-child(odd){background:var(--bg);}
 table.data-table tbody tr:last-child{border-bottom:none;}
 table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font-weight:600;}
+
+/* ══════════════════════════════════════════════════════════════════
+   OVERVIEW — ALL BRANDS — ported from the standalone Brand Goal
+   Tracker page. Its own CSS variables (--navy, --cream, etc.) are
+   scoped to #goal-tracker-view only, not :root — several of its
+   values (navy, border, bg) genuinely differ from the hub's own
+   tokens of the same name, and redefining them globally would have
+   bled into every other page. Every other class is "gt-" prefixed
+   for the same reason: the hub already has its own unrelated .card,
+   .grid, etc. from the per-brand Summary tabs.
+   ══════════════════════════════════════════════════════════════════ */
+#goal-tracker-view{
+  --navy:#0f1e3d; --cream:#ecd7b3; --green:#24E9A3; --danger:#db372d;
+  --border:#dde2ec; --bg:#f4f5f7; --ink:#14213d; --muted:#6b7280;
+  overflow-y:auto; background:var(--bg); color:var(--ink);
+}
+#goal-tracker-view .gt-wrap{ padding:20px 24px 40px; max-width:1600px; margin:0 auto; }
+#goal-tracker-view .gt-manager-block{ margin-bottom:16px; }
+#goal-tracker-view .gt-manager-title{
+  font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); font-weight:700; margin:0 0 8px 2px;
+  border-bottom:1px solid #e0e2e8; padding-bottom:5px;
+}
+#goal-tracker-view .gt-manager-title span{ color:var(--navy); }
+#goal-tracker-view .gt-grid{ display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; }
+@media (max-width: 1400px){ #goal-tracker-view .gt-grid{ grid-template-columns:repeat(4, 1fr); } }
+@media (max-width: 1100px){ #goal-tracker-view .gt-grid{ grid-template-columns:repeat(2, 1fr); } }
+#goal-tracker-view .gt-card{
+  background:#fff; border-radius:10px; overflow:hidden;
+  box-shadow:0 1px 3px rgba(15,30,61,0.08); border:1px solid #e6e8ee;
+}
+#goal-tracker-view .gt-card.gt-wide{ grid-column: span 2; }
+#goal-tracker-view .gt-card.gt-wide .gt-groups-row{ display:flex; gap:0; }
+#goal-tracker-view .gt-card.gt-wide .gt-groups-row .gt-group{ flex:1; margin:0 8px 8px; }
+#goal-tracker-view .gt-card-head{ padding:10px 12px 6px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; }
+#goal-tracker-view .gt-card-head .gt-name{
+  font-family:Georgia,'Times New Roman',serif; font-style:italic; font-weight:700;
+  font-size:15px; color:var(--navy);
+}
+#goal-tracker-view .gt-card-head .gt-chan{ font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+#goal-tracker-view .gt-card-note{ margin:0 12px 6px; font-size:9.5px; color:#b4780f; }
+#goal-tracker-view .gt-group{ background:var(--cream); margin:0 8px 8px; border-radius:7px; padding:10px 8px 10px; }
+#goal-tracker-view .gt-group-label{
+  font-family:Georgia,'Times New Roman',serif; font-style:italic; font-weight:700;
+  font-size:12px; color:var(--navy); margin-bottom:1px;
+}
+#goal-tracker-view .gt-group-note{ font-size:8.5px; color:#8a5a12; margin-bottom:5px; }
+#goal-tracker-view .gt-rings{ display:flex; justify-content:space-between; gap:4px; }
+#goal-tracker-view .gt-ring-item{ text-align:center; flex:1; min-width:0; }
+#goal-tracker-view .gt-ring-item .gt-m-label{ font-size:9px; color:#5a5f72; margin-bottom:3px; }
+#goal-tracker-view .gt-ring-item svg{ display:block; margin:0 auto; }
+#goal-tracker-view .gt-ring-item .gt-pct{ position:relative; top:-54px; font-weight:700; font-size:14px; color:var(--navy); height:0; }
+#goal-tracker-view .gt-ring-item .gt-pct.gt-flat{ color:#9aa1b1; font-size:8.5px; font-weight:600; }
+#goal-tracker-view .gt-ring-item .gt-goal{ font-size:9px; color:#3d445c; margin-top:1px; }
+#goal-tracker-view .gt-ring-item .gt-proj{ font-size:8px; color:#6b7280; }
+#goal-tracker-view .gt-ring-item .gt-goal b{ color:var(--navy); }
+#goal-tracker-view .gt-ring-item .gt-flag{
+  display:inline-block; margin-left:3px; font-size:9px; color:var(--muted);
+  border:1px solid #c2c6d1; border-radius:50%; width:13px; height:13px; line-height:11px; cursor:default;
+}
+#goal-tracker-view .gt-placeholder{
+  margin:0 12px 12px; border:1.5px dashed #c7cad4; border-radius:8px;
+  padding:18px 14px; text-align:center; color:#8b90a0; font-size:12.5px; background:#fafafb;
+}
+#goal-tracker-view .gt-placeholder b{ display:block; color:#5a5f72; font-size:13px; margin-bottom:4px; }
+#goal-tracker-view .gt-footnote{ max-width:1400px; margin:0 auto 20px; padding:0 16px; font-size:12px; color:var(--muted); }
+#goal-tracker-view .gt-footnote .gt-flag-key{ color:var(--muted); font-weight:700; }
+#goal-tracker-view .gt-pct.gt-green{ color:#0d9b6c; }
+#goal-tracker-view .gt-pct.gt-red{ color:var(--danger); }
+#goal-tracker-view .gt-pct.gt-gray{ color:#9aa1b1; font-size:10px; font-weight:600; }
+#goal-tracker-view .gt-proj.gt-green{ color:#1a9c73; }
+#goal-tracker-view .gt-proj.gt-red{ color:var(--danger); }
+#goal-tracker-view .gt-ring-item .gt-adj-note{ font-size:7.5px; color:#9aa1b1; margin-top:1px; line-height:1.2; }
 </style>
 </head>
 <body>
@@ -304,6 +381,106 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 </div>
 
 <!-- ══════════════════════════════════════
+     OVERVIEW — ALL BRANDS (Goal Tracker)
+══════════════════════════════════════ -->
+<div class="option-view" id="goal-tracker-view">
+<div class="gt-wrap">
+
+  <div class="gt-manager-block">
+    <div class="gt-manager-title">Brand Manager: <span>Isabella</span></div>
+    <div class="gt-grid">
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">Skinuva</div><div class="gt-chan">Amazon + Walmart</div></div>
+        <div class="gt-group">
+          <div class="gt-group-label">Amazon + Walmart</div>
+          <div class="gt-rings" id="r-skinuva"></div>
+        </div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">eraclea</div><div class="gt-chan">Amazon</div></div>
+        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-eraclea"></div></div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">Cosmette Skincare</div><div class="gt-chan">Amazon</div></div>
+        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-cosmette"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gt-manager-block">
+    <div class="gt-manager-title">Brand Manager: <span>Lindsay</span></div>
+    <div class="gt-grid">
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">Cloud Cafe</div><div class="gt-chan">Amazon + Walmart</div></div>
+        <div class="gt-group">
+          <div class="gt-group-label">Amazon + Walmart</div>
+          <div class="gt-rings" id="r-cloudcafe"></div>
+        </div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">Just Björn</div><div class="gt-chan">Amazon + Walmart</div></div>
+        <div class="gt-group"><div class="gt-group-label">Amazon + Walmart</div><div class="gt-rings" id="r-justbjorn"></div></div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">Amala</div><div class="gt-chan">Amazon</div></div>
+        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-amala"></div></div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">High On Love</div><div class="gt-chan">Amazon</div></div>
+        <div class="gt-placeholder">
+          <b>No actuals source found</b>
+          Not present in the Newderm orders cache (no gid on the SHEET_ORDERS tab) — confirm seller account with Lindsay.
+        </div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">The Crème Shop</div><div class="gt-chan">Amazon</div></div>
+        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-cremeshop"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gt-manager-block">
+    <div class="gt-manager-title">Brand Manager: <span>Jaclyn</span></div>
+    <div class="gt-grid">
+      <div class="gt-card gt-wide">
+        <div class="gt-card-head"><div class="gt-name">évolis</div><div class="gt-chan">Amazon + Walmart · Website</div></div>
+        <div class="gt-groups-row">
+          <div class="gt-group">
+            <div class="gt-group-label">Amazon + Walmart</div>
+            <div class="gt-rings" id="r-evolis-aw"></div>
+          </div>
+          <div class="gt-group">
+            <div class="gt-group-label">Website</div>
+            <div class="gt-rings" id="r-evolis-web"></div>
+          </div>
+        </div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">skinside SEOUL</div><div class="gt-chan">Amazon</div></div>
+        <div class="gt-group">
+          <div class="gt-group-label">Amazon</div>
+          <div class="gt-rings" id="r-skinside"></div>
+        </div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">MiGuard</div><div class="gt-chan">Amazon</div></div>
+        <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-miguard"></div></div>
+      </div>
+      <div class="gt-card">
+        <div class="gt-card-head"><div class="gt-name">PB &amp; Jay</div><div class="gt-chan">Amazon + Walmart</div></div>
+        <div class="gt-group"><div class="gt-group-label">Amazon + Walmart</div><div class="gt-rings" id="r-pbj"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gt-footnote">
+    <p>Ring fill = actual ÷ goal. Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. for X% avg. cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps.</p>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════
      OPTION A — Sidebar + Content Area
 ══════════════════════════════════════ -->
 <div class="option-view active" id="opt-a">
@@ -311,6 +488,10 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 
     <!-- Brand Sidebar -->
     <div class="brand-sidebar">
+      <button class="nav-overview-btn" id="nav-overview-btn" onclick="showOverview(this)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        Overview — All Brands
+      </button>
       <div class="bs-search"><input type="text" placeholder="Search brands…" oninput="filterBrands(this.value)"></div>
       <div class="bs-list" id="a-brand-list">
         <div class="bs-section">Live — Newderm Seller</div>
@@ -3616,6 +3797,250 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 </script>
 
 <script>
+// ── Overview — All Brands (Goal Tracker) — wrapped in its own IIFE so
+// its top-level consts/functions (GOAL_FILE_ID, ring, fmt, etc.) can't
+// collide with anything else in the hub, matching the pattern used for
+// the per-brand ported Summary modules. ──
+(function () {
+'use strict';
+
+const GOAL_FILE_ID = '1trsHDgVSLprsOOjOuFWGZRDqVOV-eII3';
+const ORDERS_FILE_ID = '1SiYu8e2-Pfi14Aiuf6SAFytWVXb4_dtdNFT6wvLFPok';
+const WALMART_FILE_ID = '1oIZDxN0vSf4nRvE_K95lsNyBWQd4Ef2aARm0RUtvE0Y';
+const ADS_FILE_ID = '1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI';
+
+const TODAY_DAY = 14;
+const DAYS_IN_MONTH = 30;
+
+const BRAND_GOAL_CONFIG = {
+  'r-skinuva':    { goalGid:196666138,  goalCols:{total:13, organic:18, ads:26}, goal:{total:186800, organic:76000, ads:46700}, organicConfirmed:true,  actual:{total:52236, organic:38617, ads:13619}, ordersGid:39113380,   cancelRate:0.069 },
+  'r-eraclea':    { goalGid:942935799,  goalCols:{total:14, organic:18, ads:23}, goal:{total:2600,   organic:700,   ads:1667},  organicConfirmed:false, actual:{total:742,   organic:434,   ads:308}, ordersGid:1048076976, cancelRate:0.075 },
+  'r-cosmette':   { goalGid:1084102342, goalCols:{total:14, organic:18, ads:23}, goal:{total:2200,   organic:1900,  ads:300},   organicConfirmed:false, actual:{total:563,   organic:377,   ads:186}, ordersGid:982399951,  cancelRate:0.149 },
+  'r-cloudcafe':  { goalGid:1949875192, goalCols:{total:13, organic:18, ads:24}, goal:{total:11023,  organic:6690,  ads:4333},  organicConfirmed:true,  actual:{total:1742,  organic:1506,  ads:236}, ordersGid:782298390,  cancelRate:0.086 },
+  'r-justbjorn':  { goalGid:333511738,  goalCols:{total:14, organic:18, ads:25}, goal:{total:7948,   organic:5157,  ads:2790},  organicConfirmed:true,  actual:{total:2614,  organic:2307,  ads:307}, ordersGid:1781575614, cancelRate:0.105 },
+  'r-amala':      { goalGid:2031782096, goalCols:{total:14, organic:null, ads:23}, goal:{total:1998,   organic:null,  ads:467},   organicConfirmed:null,  actual:{total:114,   organic:null,  ads:0}, ordersGid:1410727505, cancelRate:0.056 },
+  'r-cremeshop':  { goalGid:521249346,  goalCols:{total:13, organic:18,   ads:25}, goal:{total:19708,  organic:14708, ads:5000},  organicConfirmed:true,  actual:{total:6426,  organic:5543,  ads:883}, ordersGid:1259265896, cancelRate:0.077 },
+  'r-evolis-aw':  { goalGid:154860784,  goalCols:{total:14, organic:19, ads:29}, goal:{total:4267,   organic:3100,  ads:1167},  organicConfirmed:true,  actual:{total:2260,  organic:1694,  ads:566}, ordersGid:1163928587, cancelRate:0.083 },
+  'r-evolis-web': { goalGid:1655791223, goalCols:{total:14, organic:19, ads:29}, goal:{total:1075,   organic:1075,  ads:null},  organicConfirmed:true,  actual:{total:1866,  organic:805,   ads:1061} },
+  'r-miguard':    { goalGid:332019976,  goalCols:{total:13, organic:16, ads:23}, goal:{total:3047,   organic:2157,  ads:890},   organicConfirmed:true,  actual:{total:1159,  organic:1039,  ads:120}, ordersGid:1608462008, cancelRate:0.144 },
+  'r-pbj':        { goalGid:1675074463, goalCols:{total:14, organic:18, ads:25}, goal:{total:2031,   organic:475,   ads:1556},  organicConfirmed:true,  actual:{total:285,   organic:62,    ads:223}, ordersGid:1152606039, cancelRate:0.046 },
+  'r-skinside':   { goalGid:1677661344, goalCols:{total:15, organic:18, ads:27}, goal:{total:300,    organic:300,   ads:null},  organicConfirmed:true,  actual:{total:192,   organic:36,    ads:156}, ordersGid:545265606,  cancelRate:0.042 },
+};
+
+function parseCsvRows(csv){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < csv.length; i++) {
+    const c = csv[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (csv[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\r') { /* skip */ }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else field += c;
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+function parseGoalAmt(v){
+  if (v == null) return null;
+  const n = parseFloat(String(v).replace(/[$,]/g, '').trim());
+  return isNaN(n) ? null : n;
+}
+function currentMonthStr(){
+  const now = new Date();
+  return now.toLocaleString('en-US', { month: 'short' }) + '-' + String(now.getFullYear()).slice(2);
+}
+async function fetchLiveGoal(cfg){
+  if (!cfg.goalGid) return null;
+  try {
+    const res = await fetch(`https://docs.google.com/spreadsheets/d/${GOAL_FILE_ID}/export?format=csv&gid=${cfg.goalGid}`);
+    if (!res.ok) return null;
+    const rows = parseCsvRows(await res.text());
+    const monthStr = currentMonthStr();
+    const row = rows.find(r => (r[0] || '').trim() === monthStr);
+    if (!row) return null;
+    return {
+      total:   cfg.goalCols.total   != null ? parseGoalAmt(row[cfg.goalCols.total])   : null,
+      organic: cfg.goalCols.organic != null ? parseGoalAmt(row[cfg.goalCols.organic]) : null,
+      ads:     cfg.goalCols.ads     != null ? parseGoalAmt(row[cfg.goalCols.ads])     : null,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function fetchCancelRate(cfg){
+  if (!cfg.ordersGid) return undefined;
+  try {
+    const res = await fetch(`https://docs.google.com/spreadsheets/d/${ORDERS_FILE_ID}/export?format=csv&gid=${cfg.ordersGid}`);
+    if (!res.ok) return undefined;
+    const rows = parseCsvRows(await res.text());
+    const header = rows[0].map(h => h.trim());
+    const idx = {};
+    header.forEach((h, i) => idx[h] = i);
+    if (idx['order_id'] === undefined || idx['date'] === undefined || idx['status'] === undefined) return undefined;
+
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    const orders = {};
+
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.length < 2) continue;
+      const oid = (r[idx['order_id']] || '').trim();
+      if (!oid) continue;
+      const dateStr = (r[idx['date']] || '').trim();
+      let year, month;
+      let m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) { year = parseInt(m[1]); month = parseInt(m[2]); }
+      else {
+        m = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (m) { year = parseInt(m[3]); month = parseInt(m[1]); }
+        else continue;
+      }
+      const isCancelled = (r[idx['status']] || '').trim() === 'Cancelled';
+      const isVine = idx['promotion_ids'] !== undefined && (r[idx['promotion_ids']] || '').toLowerCase().includes('vine');
+      if (!orders[oid]) orders[oid] = { cancelled: false, vine: false, year, month };
+      if (isCancelled) orders[oid].cancelled = true;
+      if (isVine) orders[oid].vine = true;
+    }
+
+    const monthKeys = Object.values(orders).map(o => `${o.year}-${o.month}`);
+    const distinctMonths = [...new Set(monthKeys)].sort();
+    if (distinctMonths.length === 0) return null;
+    const windowStartKey = distinctMonths[0];
+
+    let total = 0, cancelled = 0;
+    for (const o of Object.values(orders)) {
+      if (o.vine) continue;
+      const key = `${o.year}-${o.month}`;
+      if (key === currentKey || key === windowStartKey) continue;
+      total++;
+      if (o.cancelled) cancelled++;
+    }
+    return total > 0 ? cancelled / total : null;
+  } catch (e) {
+    return undefined;
+  }
+}
+
+function fmt(n){ return (n===null||n===undefined) ? '—' : '$' + Math.round(n).toLocaleString(); }
+
+function projected(actual, cancelRate, applyCancelAdj){
+  if (actual === null) return null;
+  const raw = actual / TODAY_DAY * DAYS_IN_MONTH;
+  if (!applyCancelAdj || cancelRate === undefined || cancelRate === null) return raw;
+  return raw * (1 - cancelRate);
+}
+
+function ring(fillPct, colorClass, size=80, stroke=7){
+  const r=(size-stroke)/2, c=size/2, circ=2*Math.PI*r;
+  if (colorClass === 'gray') {
+    return `<svg width="${size}" height="${size}"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${stroke}"/></svg>`;
+  }
+  const clamped = Math.max(0, Math.min(1, fillPct));
+  const color = colorClass === 'green' ? 'var(--green)' : 'var(--danger)';
+  const dash = clamped*circ;
+  return `<svg width="${size}" height="${size}">
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${stroke}"/>
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+      stroke-dasharray="${dash} ${circ}" stroke-linecap="round"
+      transform="rotate(-90 ${c} ${c})"/>
+  </svg>`;
+}
+
+function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj){
+  const flagHtml = flagged ? '<span class="gt-flag" title="Organic column unconfirmed">⚠</span>' : '';
+  if (goal === null || goal === undefined) {
+    return `<div class="gt-ring-item">
+      <div class="gt-m-label">${label}${flagHtml}</div>
+      ${ring(0,'gray')}
+      <div class="gt-pct gt-gray">No goal<br>set</div>
+      <div class="gt-goal">${actual!=null ? 'MTD ' + fmt(actual) : '—'}</div>
+    </div>`;
+  }
+  if (actual === null || actual === undefined) {
+    return `<div class="gt-ring-item">
+      <div class="gt-m-label">${label}${flagHtml}</div>
+      ${ring(0,'gray')}
+      <div class="gt-pct gt-gray">Not available<br>yet</div>
+      <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
+    </div>`;
+  }
+  const fillPct = actual / goal;
+  const proj = projected(actual, cancelRate, applyCancelAdj);
+  const colorClass = proj >= goal ? 'green' : 'red';
+  let adjNote = '';
+  if (applyCancelAdj) {
+    adjNote = cancelRate != null
+      ? `<div class="gt-adj-note">adj. for ${Math.round(cancelRate*100)}% avg. cancel rate</div>`
+      : `<div class="gt-adj-note">no cancel-rate history yet</div>`;
+  }
+  return `<div class="gt-ring-item">
+    <div class="gt-m-label">${label}${flagHtml}</div>
+    ${ring(fillPct, colorClass)}
+    <div class="gt-pct gt-${colorClass}">${Math.round(fillPct*100)}%</div>
+    <div class="gt-proj gt-${colorClass}">Projecting ${fmt(proj)}</div>
+    <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
+    ${adjNote}
+  </div>`;
+}
+
+function renderCard(elId, cfg, goal, cancelRate){
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const adjApplies = cfg.ordersGid != null;
+  el.innerHTML =
+    metricBlock('Total Sales', goal.total, cfg.actual.total, false, cancelRate, adjApplies) +
+    metricBlock('Organic Sales', goal.organic, cfg.actual.organic, cfg.organicConfirmed === false, cancelRate, adjApplies) +
+    metricBlock('Ad Sales', goal.ads, cfg.actual.ads, false, undefined, false);
+}
+
+const liveState = {};
+for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
+  liveState[elId] = { goal: cfg.goal, cancelRate: cfg.cancelRate };
+}
+
+for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
+  renderCard(elId, cfg, liveState[elId].goal, liveState[elId].cancelRate);
+}
+
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(undefined), ms))
+  ]);
+}
+for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
+  if (cfg.goalGid) {
+    withTimeout(fetchLiveGoal(cfg), 4000).then(liveGoal => {
+      if (liveGoal) {
+        liveState[elId].goal = liveGoal;
+        renderCard(elId, cfg, liveState[elId].goal, liveState[elId].cancelRate);
+      }
+    });
+  }
+  if (cfg.ordersGid) {
+    withTimeout(fetchCancelRate(cfg), 4000).then(rate => {
+      if (rate !== undefined) {
+        liveState[elId].cancelRate = rate;
+        renderCard(elId, cfg, liveState[elId].goal, liveState[elId].cancelRate);
+      }
+    });
+  }
+}
+
+})();
+</script>
+
+<script>
 // ── Brand data for Option A cards ──
 // ── Évolis Summary tab — ported verbatim from Évolis's own internal
 // Overview page (Goal Tracker, KPI rows, donut/trend/ad-type charts,
@@ -4026,7 +4451,17 @@ let currentViewA = 'cards';
 let currentUrlA = 'https://evolis.medaltus.com/';
 let currentNameA = 'Évolis';
 
+function showOverview(btn) {
+  document.querySelectorAll('#opt-a .brand-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('opt-a').classList.remove('active');
+  document.getElementById('goal-tracker-view').classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
 function selectBrandA(btn, name, id, url) {
+  document.getElementById('goal-tracker-view').classList.remove('active');
+  document.getElementById('opt-a').classList.add('active');
+  document.getElementById('nav-overview-btn').classList.remove('active');
   document.querySelectorAll('#opt-a .brand-item').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('a-brand-name').textContent = name;
