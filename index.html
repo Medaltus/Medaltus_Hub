@@ -3855,7 +3855,13 @@ const BRAND_GOAL_CONFIG = {
   'r-miguard':    { goalGid:332019976,  goalCols:{total:13, organic:16, ads:23}, goal:{total:3047,   organic:2157,  ads:890},   organicConfirmed:true,
                     ordersGid:1608462008, walmartGid:null,       adOrdersGid:862206070 },
   'r-pbj':        { goalGid:1675074463, goalCols:{total:14, organic:18, ads:25}, goal:{total:2031,   organic:475,   ads:1556},  organicConfirmed:true,
-                    ordersGid:1150392606, walmartGid:96465947,   adOrdersGid:863329955 },
+                    // ordersGid reverted to the original value — switching it to the
+                    // Dashboard Mapping's 1150392606 (two turns ago) coincides exactly
+                    // with PB&Jay going fully blank ("Not available yet" on all three
+                    // rings), strong evidence that gid is wrong/inaccessible on this
+                    // file. Can't verify either number against the live sheet from
+                    // here — worth confirming which is actually correct.
+                    ordersGid:1152606039, walmartGid:96465947,   adOrdersGid:863329955 },
   'r-skinside':   { goalGid:1677661344, goalCols:{total:15, organic:18, ads:27}, goal:{total:300,    organic:300,   ads:null},  organicConfirmed:true,
                     ordersGid:545265606,  walmartGid:null,       adOrdersGid:1620705430 },
 };
@@ -4092,15 +4098,21 @@ function withTimeout(promise, ms){
 // as $0, never silently blank.
 async function loadBrandActual(elId, cfg, target){
   if (cfg.website) {
-    const [ordersRows, adsRows] = await Promise.all([
-      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ORDERS_GID),
-      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ADS_GID),
-    ]);
+    const ordersRows = await fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ORDERS_GID);
     if (ordersRows.length === 0) return { actual: { total: null, organic: null, ads: null }, cancelRate: undefined };
     const total = sumWebsiteOrdersRevenue(ordersRows, target.year, target.month, target.throughDay);
-    const ads = adsRows.length ? sumWebsiteAdsRevenue(adsRows, target.year, target.month, target.throughDay) : 0;
-    const organic = Math.max(0, total - ads);
-    return { actual: { total, organic, ads }, cancelRate: undefined };
+    // Ads/Organic deliberately NOT computed from the ads tab's `revenue`
+    // column — verified against a real export that it's ~98% of total
+    // site revenue (a broad Google Ads "all conversions" value, not true
+    // ad-attributed dollars), while the real dashboard's own unit-level
+    // split shows ads at only ~17% of units. Subtracting that revenue
+    // figure from Total was collapsing Organic to near-zero. No other
+    // sheet here gives a trustworthy dollar-level ad attribution (the
+    // shopping tab's conversions_value is far too small to be it), so
+    // these stay "Not available yet" rather than show a number derived
+    // from a column that's already been shown not to mean what it looks
+    // like it means.
+    return { actual: { total, organic: null, ads: null }, cancelRate: undefined };
   }
 
   const fetches = [fetchCsvRows(AMAZON_FILE_ID, cfg.ordersGid)];
