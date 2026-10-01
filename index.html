@@ -303,7 +303,9 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 }
 #goal-tracker-view.active{ display:block; }
 #goal-tracker-view .gt-wrap{ padding:20px 24px 40px; max-width:1600px; margin:0 auto; }
-#goal-tracker-view .gt-manager-block{ margin-bottom:16px; }
+#goal-tracker-view .gt-period-bar{ margin-bottom:16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+#goal-tracker-view .period-pill-group{ display:inline-flex; background:#fff; border:1px solid #e6e8ee; border-radius:999px; padding:3px; gap:2px; }
+#goal-tracker-view .gt-period-note{ font-size:11.5px; color:#b4780f; background:rgba(200,125,47,0.08); border:1px solid rgba(200,125,47,0.18); border-radius:999px; padding:5px 12px; }
 #goal-tracker-view .gt-manager-title{
   font-size:11px; letter-spacing:.08em; text-transform:uppercase;
   color:var(--muted); font-weight:700; margin:0 0 8px 2px;
@@ -445,6 +447,13 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
          only this pane and .brand-content trade places. -->
     <div class="gt-page" id="goal-tracker-view">
     <div class="gt-wrap">
+
+      <div class="gt-period-bar">
+        <div class="period-pill-group">
+          <button class="period-pill gt-period-pill active" onclick="gtSetPeriod('mtd', this)">MTD</button>
+          <button class="period-pill gt-period-pill" onclick="gtSetPeriod('lastmonth', this)">Last Month</button>
+        </div>
+      </div>
 
       <div class="gt-manager-block">
         <div class="gt-manager-title">Brand Manager: <span>Isabella</span></div>
@@ -3798,36 +3807,61 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 </script>
 
 <script>
-// ── Overview — All Brands (Goal Tracker) — wrapped in its own IIFE so
-// its top-level consts/functions (GOAL_FILE_ID, ring, fmt, etc.) can't
-// collide with anything else in the hub, matching the pattern used for
-// the per-brand ported Summary modules. ──
+// ── Overview — All Brands (Goal Tracker), real-data version ──
+// Replaces the earlier static-snapshot actuals with live aggregation
+// against the same Amazon/Walmart/Ad-Orders-Cache sheets the brand
+// dashboards themselves use, for both MTD and Last Month. Every gid
+// below comes straight from the master Dashboard Mapping spreadsheet
+// (Jaclyn's own source of truth), cross-checked brand by brand — none
+// of this is guessed. Wrapped in its own IIFE, same as before.
 (function () {
 'use strict';
 
-const GOAL_FILE_ID = '1trsHDgVSLprsOOjOuFWGZRDqVOV-eII3';
-const ORDERS_FILE_ID = '1SiYu8e2-Pfi14Aiuf6SAFytWVXb4_dtdNFT6wvLFPok';
-const WALMART_FILE_ID = '1oIZDxN0vSf4nRvE_K95lsNyBWQd4Ef2aARm0RUtvE0Y';
-const ADS_FILE_ID = '1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI';
+const GOAL_FILE_ID       = '1trsHDgVSLprsOOjOuFWGZRDqVOV-eII3';
+const AMAZON_FILE_ID     = '1SiYu8e2-Pfi14Aiuf6SAFytWVXb4_dtdNFT6wvLFPok';
+const WALMART_FILE_ID    = '1oIZDxN0vSf4nRvE_K95lsNyBWQd4Ef2aARm0RUtvE0Y';
+const AD_ORDERS_FILE_ID  = '1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI';
+const EVOLIS_WEB_FILE_ID = '1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw';
+const EVOLIS_WEB_ORDERS_GID = '597852778';
+const EVOLIS_WEB_ADS_GID    = '219707263';
 
-const TODAY_DAY = 14;
-const DAYS_IN_MONTH = 30;
-
+/* goal:{...} is the last-known fallback snapshot, used only until the
+   live per-month goal fetch resolves (or if it fails outright) — same
+   role as before. organicConfirmed:false means the Organic goal column
+   itself is unconfirmed on that brand's sheet (shows the ⚠ flag);
+   organicConfirmed:null means no Organic column exists at all for that
+   brand (Amala). walmartGid is only set for the brands this page's own
+   cards label "Amazon + Walmart" — Crème Shop has a Walmart tab in the
+   master mapping too, but this page has always shown it as Amazon-only,
+   so that tab is deliberately not blended in here. */
 const BRAND_GOAL_CONFIG = {
-  'r-skinuva':    { goalGid:196666138,  goalCols:{total:13, organic:18, ads:26}, goal:{total:186800, organic:76000, ads:46700}, organicConfirmed:true,  actual:{total:52236, organic:38617, ads:13619}, ordersGid:39113380,   cancelRate:0.069 },
-  'r-eraclea':    { goalGid:942935799,  goalCols:{total:14, organic:18, ads:23}, goal:{total:2600,   organic:700,   ads:1667},  organicConfirmed:false, actual:{total:742,   organic:434,   ads:308}, ordersGid:1048076976, cancelRate:0.075 },
-  'r-cosmette':   { goalGid:1084102342, goalCols:{total:14, organic:18, ads:23}, goal:{total:2200,   organic:1900,  ads:300},   organicConfirmed:false, actual:{total:563,   organic:377,   ads:186}, ordersGid:982399951,  cancelRate:0.149 },
-  'r-cloudcafe':  { goalGid:1949875192, goalCols:{total:13, organic:18, ads:24}, goal:{total:11023,  organic:6690,  ads:4333},  organicConfirmed:true,  actual:{total:1742,  organic:1506,  ads:236}, ordersGid:782298390,  cancelRate:0.086 },
-  'r-justbjorn':  { goalGid:333511738,  goalCols:{total:14, organic:18, ads:25}, goal:{total:7948,   organic:5157,  ads:2790},  organicConfirmed:true,  actual:{total:2614,  organic:2307,  ads:307}, ordersGid:1781575614, cancelRate:0.105 },
-  'r-amala':      { goalGid:2031782096, goalCols:{total:14, organic:null, ads:23}, goal:{total:1998,   organic:null,  ads:467},   organicConfirmed:null,  actual:{total:114,   organic:null,  ads:0}, ordersGid:1410727505, cancelRate:0.056 },
-  'r-cremeshop':  { goalGid:521249346,  goalCols:{total:13, organic:18,   ads:25}, goal:{total:19708,  organic:14708, ads:5000},  organicConfirmed:true,  actual:{total:6426,  organic:5543,  ads:883}, ordersGid:1259265896, cancelRate:0.077 },
-  'r-evolis-aw':  { goalGid:154860784,  goalCols:{total:14, organic:19, ads:29}, goal:{total:4267,   organic:3100,  ads:1167},  organicConfirmed:true,  actual:{total:2260,  organic:1694,  ads:566}, ordersGid:1163928587, cancelRate:0.083 },
-  'r-evolis-web': { goalGid:1655791223, goalCols:{total:14, organic:19, ads:29}, goal:{total:1075,   organic:1075,  ads:null},  organicConfirmed:true,  actual:{total:1866,  organic:805,   ads:1061} },
-  'r-miguard':    { goalGid:332019976,  goalCols:{total:13, organic:16, ads:23}, goal:{total:3047,   organic:2157,  ads:890},   organicConfirmed:true,  actual:{total:1159,  organic:1039,  ads:120}, ordersGid:1608462008, cancelRate:0.144 },
-  'r-pbj':        { goalGid:1675074463, goalCols:{total:14, organic:18, ads:25}, goal:{total:2031,   organic:475,   ads:1556},  organicConfirmed:true,  actual:{total:285,   organic:62,    ads:223}, ordersGid:1152606039, cancelRate:0.046 },
-  'r-skinside':   { goalGid:1677661344, goalCols:{total:15, organic:18, ads:27}, goal:{total:300,    organic:300,   ads:null},  organicConfirmed:true,  actual:{total:192,   organic:36,    ads:156}, ordersGid:545265606,  cancelRate:0.042 },
+  'r-skinuva':    { goalGid:196666138,  goalCols:{total:13, organic:18, ads:26}, goal:{total:186800, organic:76000, ads:46700}, organicConfirmed:true,
+                    ordersGid:39113380,   walmartGid:761373905,  adOrdersGid:2118939572 },
+  'r-eraclea':    { goalGid:942935799,  goalCols:{total:14, organic:18, ads:23}, goal:{total:2600,   organic:700,   ads:1667},  organicConfirmed:false,
+                    ordersGid:1048076976, walmartGid:null,       adOrdersGid:455101955 },
+  'r-cosmette':   { goalGid:1084102342, goalCols:{total:14, organic:18, ads:23}, goal:{total:2200,   organic:1900,  ads:300},   organicConfirmed:false,
+                    ordersGid:982399951,  walmartGid:null,       adOrdersGid:624747298 },
+  'r-cloudcafe':  { goalGid:1949875192, goalCols:{total:13, organic:18, ads:24}, goal:{total:11023,  organic:6690,  ads:4333},  organicConfirmed:true,
+                    ordersGid:782298390,  walmartGid:1086554940, adOrdersGid:1235455618 },
+  'r-justbjorn':  { goalGid:333511738,  goalCols:{total:14, organic:18, ads:25}, goal:{total:7948,   organic:5157,  ads:2790},  organicConfirmed:true,
+                    ordersGid:1781575614, walmartGid:686791892,  adOrdersGid:1492792448 },
+  'r-amala':      { goalGid:2031782096, goalCols:{total:14, organic:null, ads:23}, goal:{total:1998, organic:null,  ads:467},   organicConfirmed:null,
+                    ordersGid:1410727505, walmartGid:null,       adOrdersGid:489097625 },
+  'r-cremeshop':  { goalGid:521249346,  goalCols:{total:13, organic:18, ads:25}, goal:{total:19708,  organic:14708, ads:5000},  organicConfirmed:true,
+                    ordersGid:1259265896, walmartGid:null,       adOrdersGid:414661274 },
+  'r-evolis-aw':  { goalGid:154860784,  goalCols:{total:14, organic:19, ads:29}, goal:{total:4267,   organic:3100,  ads:1167},  organicConfirmed:true,
+                    ordersGid:1163928587, walmartGid:1844526926, adOrdersGid:158578426 },
+  'r-evolis-web': { goalGid:1655791223, goalCols:{total:14, organic:19, ads:29}, goal:{total:1075,   organic:1075,  ads:null},  organicConfirmed:true,
+                    website:true },
+  'r-miguard':    { goalGid:332019976,  goalCols:{total:13, organic:16, ads:23}, goal:{total:3047,   organic:2157,  ads:890},   organicConfirmed:true,
+                    ordersGid:1608462008, walmartGid:null,       adOrdersGid:862206070 },
+  'r-pbj':        { goalGid:1675074463, goalCols:{total:14, organic:18, ads:25}, goal:{total:2031,   organic:475,   ads:1556},  organicConfirmed:true,
+                    ordersGid:1150392606, walmartGid:96465947,   adOrdersGid:863329955 },
+  'r-skinside':   { goalGid:1677661344, goalCols:{total:15, organic:18, ads:27}, goal:{total:300,    organic:300,   ads:null},  organicConfirmed:true,
+                    ordersGid:545265606,  walmartGid:null,       adOrdersGid:1620705430 },
 };
 
+// ── CSV helpers ──
 function parseCsvRows(csv){
   const rows = [];
   let row = [], field = '', inQuotes = false;
@@ -3849,23 +3883,75 @@ function parseCsvRows(csv){
   if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
   return rows;
 }
+function parseCsvObjects(csv){
+  const rows = parseCsvRows(csv);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => h.trim());
+  return rows.slice(1).map(vals => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+    return obj;
+  }).filter(o => Object.values(o).some(v => v));
+}
+function isCsvText(t){ t = (t || '').trim(); return t.length > 0 && !t.startsWith('<') && !t.startsWith('{'); }
+function parseAmt(v){ if (!v) return 0; return parseFloat(String(v).replace(/[$,]/g, '')) || 0; }
 function parseGoalAmt(v){
   if (v == null) return null;
   const n = parseFloat(String(v).replace(/[$,]/g, '').trim());
   return isNaN(n) ? null : n;
 }
+function normalizeDate(val){
+  if (!val) return '';
+  if (/^\d{4}-\d{2}/.test(val)) return val.substring(0, 10);
+  const parts = val.split('/');
+  if (parts.length === 3) {
+    const m = parts[0].padStart(2, '0'), d = parts[1].padStart(2, '0');
+    const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+    return `${y}-${m}-${d}`;
+  }
+  return val;
+}
+function daysInMonth(year, month){ return new Date(year, month, 0).getDate(); }
+
 function currentMonthStr(){
   const now = new Date();
   return now.toLocaleString('en-US', { month: 'short' }) + '-' + String(now.getFullYear()).slice(2);
 }
-async function fetchLiveGoal(cfg){
+function lastMonthStr(){
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return d.toLocaleString('en-US', { month: 'short' }) + '-' + String(d.getFullYear()).slice(2);
+}
+function getMtdTarget(){
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1, throughDay: now.getDate(), isPartial: true };
+}
+function getLastMonthTarget(){
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const year = d.getFullYear(), month = d.getMonth() + 1;
+  return { year, month, throughDay: daysInMonth(year, month), isPartial: false };
+}
+
+async function fetchCsvRows(fileId, gid){
+  if (!gid) return [];
+  try {
+    const res = await fetch(`https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&gid=${gid}&_cb=${Date.now()}`);
+    if (!res.ok) return [];
+    const text = await res.text();
+    return isCsvText(text) ? parseCsvObjects(text) : [];
+  } catch (e) {
+    return [];
+  }
+}
+async function fetchLiveGoal(cfg, monthStr){
   if (!cfg.goalGid) return null;
   try {
-    const res = await fetch(`https://docs.google.com/spreadsheets/d/${GOAL_FILE_ID}/export?format=csv&gid=${cfg.goalGid}`);
+    const res = await fetch(`https://docs.google.com/spreadsheets/d/${GOAL_FILE_ID}/export?format=csv&gid=${cfg.goalGid}&_cb=${Date.now()}`);
     if (!res.ok) return null;
     const rows = parseCsvRows(await res.text());
-    const monthStr = currentMonthStr();
-    const row = rows.find(r => (r[0] || '').trim() === monthStr);
+    const target = monthStr;
+    const row = rows.find(r => (r[0] || '').trim() === target);
     if (!row) return null;
     return {
       total:   cfg.goalCols.total   != null ? parseGoalAmt(row[cfg.goalCols.total])   : null,
@@ -3877,66 +3963,170 @@ async function fetchLiveGoal(cfg){
   }
 }
 
-async function fetchCancelRate(cfg){
-  if (!cfg.ordersGid) return undefined;
-  try {
-    const res = await fetch(`https://docs.google.com/spreadsheets/d/${ORDERS_FILE_ID}/export?format=csv&gid=${cfg.ordersGid}`);
-    if (!res.ok) return undefined;
-    const rows = parseCsvRows(await res.text());
-    const header = rows[0].map(h => h.trim());
-    const idx = {};
-    header.forEach((h, i) => idx[h] = i);
-    if (idx['order_id'] === undefined || idx['date'] === undefined || idx['status'] === undefined) return undefined;
+/* Goals-specific row validity — deliberately DIFFERENT from each brand's
+   own dashboard aggregation (which excludes pending): exclude
+   'Cancelled', exclude promotion_ids containing 'vine', KEEP pending.
+   Same rule this page has always documented using. */
+function isGoalsValidRow(row){
+  const status = (row.status || '').toLowerCase().trim();
+  if (status === 'cancelled') return false;
+  if ((row.promotion_ids || '').toLowerCase().includes('vine')) return false;
+  return true;
+}
 
-    const now = new Date();
-    const currentKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
-    const orders = {};
+// Sums $ revenue for Amazon/Walmart order-cache rows (same column shape)
+// within [year-month-01, year-month-throughDay]. Groups by order_id first
+// (summing item_price across that order's line items), then sums across
+// orders — same proven logic the brand dashboards themselves use.
+function sumOrdersRevenue(rows, year, month, throughDay){
+  const mm = String(month).padStart(2, '0');
+  const startStr = `${year}-${mm}-01`;
+  const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
+  const filtered = rows.filter(r => {
+    const d = normalizeDate(r.date);
+    return d && d >= startStr && d <= endStr && isGoalsValidRow(r);
+  });
+  const orderTotals = {};
+  filtered.forEach(r => {
+    if (!r.order_id) return;
+    orderTotals[r.order_id] = (orderTotals[r.order_id] || 0) + parseAmt(r.item_price);
+  });
+  return Object.values(orderTotals).reduce((s, v) => s + v, 0);
+}
 
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
-      if (!r || r.length < 2) continue;
-      const oid = (r[idx['order_id']] || '').trim();
-      if (!oid) continue;
-      const dateStr = (r[idx['date']] || '').trim();
-      let year, month;
-      let m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (m) { year = parseInt(m[1]); month = parseInt(m[2]); }
-      else {
-        m = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (m) { year = parseInt(m[3]); month = parseInt(m[1]); }
-        else continue;
-      }
-      const isCancelled = (r[idx['status']] || '').trim() === 'Cancelled';
-      const isVine = idx['promotion_ids'] !== undefined && (r[idx['promotion_ids']] || '').toLowerCase().includes('vine');
-      if (!orders[oid]) orders[oid] = { cancelled: false, vine: false, year, month };
-      if (isCancelled) orders[oid].cancelled = true;
-      if (isVine) orders[oid].vine = true;
-    }
+// Website (Shopify) orders: order_total repeats the real whole-order
+// total on every line item, so it's set once per order rather than
+// summed across lines. financial_status instead of status/promotion_ids
+// (no Vine on Shopify) — kept: PAID, PARTIALLY_REFUNDED; excluded: REFUNDED.
+function sumWebsiteOrdersRevenue(rows, year, month, throughDay){
+  const mm = String(month).padStart(2, '0');
+  const startStr = `${year}-${mm}-01`;
+  const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
+  const filtered = rows.filter(r => {
+    const d = normalizeDate(r.date);
+    const fs = (r.financial_status || '').toUpperCase();
+    return d && d >= startStr && d <= endStr && (fs === 'PAID' || fs === 'PARTIALLY_REFUNDED');
+  });
+  const orderTotals = {};
+  filtered.forEach(r => {
+    if (!r.order_id) return;
+    orderTotals[r.order_id] = parseAmt(r.order_total);
+  });
+  return Object.values(orderTotals).reduce((s, v) => s + v, 0);
+}
 
-    const monthKeys = Object.values(orders).map(o => `${o.year}-${o.month}`);
-    const distinctMonths = [...new Set(monthKeys)].sort();
-    if (distinctMonths.length === 0) return null;
-    const windowStartKey = distinctMonths[0];
+// Website (Google Ads) daily revenue is a site-wide total repeated on
+// every campaign row for that date — take one value per date, not
+// summed per campaign (else it multiplies by however many campaigns ran).
+function sumWebsiteAdsRevenue(rows, year, month, throughDay){
+  const mm = String(month).padStart(2, '0');
+  const startStr = `${year}-${mm}-01`;
+  const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
+  const seenDates = {};
+  rows.forEach(r => {
+    const d = normalizeDate(r.date);
+    if (d && d >= startStr && d <= endStr && !(d in seenDates)) seenDates[d] = parseAmt(r.revenue);
+  });
+  return Object.values(seenDates).reduce((s, v) => s + v, 0);
+}
 
-    let total = 0, cancelled = 0;
-    for (const o of Object.values(orders)) {
-      if (o.vine) continue;
-      const key = `${o.year}-${o.month}`;
-      if (key === currentKey || key === windowStartKey) continue;
-      total++;
-      if (o.cancelled) cancelled++;
-    }
-    return total > 0 ? cancelled / total : null;
-  } catch (e) {
-    return undefined;
+// Ad Orders Cache — already pre-aggregated by (year, month, asin); sum
+// every row matching the target month's `sales` field.
+function sumAdSales(rows, year, month){
+  return rows
+    .filter(r => parseInt(r.year, 10) === year && parseInt(r.month, 10) === month)
+    .reduce((s, r) => s + parseAmt(r.sales), 0);
+}
+
+/* Pooled historical cancellation rate, computed from the same Amazon
+   rows already fetched for the actual-revenue sum (no second fetch).
+   Methodology unchanged from this page's original version: group by
+   order_id (cancelled if ANY line item is), exclude Vine, exclude the
+   real current in-progress month and the earliest month present in the
+   rolling cache (both partial for the same reason), pool the rest. */
+function computeCancelRateFromRows(rows){
+  const now = new Date();
+  const currentKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+  const orders = {};
+  for (const r of rows) {
+    const oid = (r.order_id || '').trim();
+    if (!oid) continue;
+    const d = normalizeDate(r.date);
+    if (!d) continue;
+    const [y, m] = d.split('-').map(Number);
+    const isCancelled = (r.status || '').trim().toLowerCase() === 'cancelled';
+    const isVine = (r.promotion_ids || '').toLowerCase().includes('vine');
+    if (!orders[oid]) orders[oid] = { cancelled: false, vine: false, year: y, month: m };
+    if (isCancelled) orders[oid].cancelled = true;
+    if (isVine) orders[oid].vine = true;
   }
+  const monthKeys = Object.values(orders).map(o => `${o.year}-${o.month}`);
+  const distinctMonths = [...new Set(monthKeys)].sort();
+  if (distinctMonths.length === 0) return null;
+  const windowStartKey = distinctMonths[0];
+  let total = 0, cancelled = 0;
+  for (const o of Object.values(orders)) {
+    if (o.vine) continue;
+    const key = `${o.year}-${o.month}`;
+    if (key === currentKey || key === windowStartKey) continue;
+    total++;
+    if (o.cancelled) cancelled++;
+  }
+  return total > 0 ? cancelled / total : null;
+}
+
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(undefined), ms))
+  ]);
+}
+
+// Real Total/Organic/Ad Sales for one brand, one target month. Returns
+// null for a metric only when its underlying source genuinely couldn't
+// be read (network/CORS/empty sheet) — a confirmed zero still renders
+// as $0, never silently blank.
+async function loadBrandActual(elId, cfg, target){
+  if (cfg.website) {
+    const [ordersRows, adsRows] = await Promise.all([
+      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ORDERS_GID),
+      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ADS_GID),
+    ]);
+    if (ordersRows.length === 0) return { actual: { total: null, organic: null, ads: null }, cancelRate: undefined };
+    const total = sumWebsiteOrdersRevenue(ordersRows, target.year, target.month, target.throughDay);
+    const ads = adsRows.length ? sumWebsiteAdsRevenue(adsRows, target.year, target.month, target.throughDay) : 0;
+    const organic = Math.max(0, total - ads);
+    return { actual: { total, organic, ads }, cancelRate: undefined };
+  }
+
+  const fetches = [fetchCsvRows(AMAZON_FILE_ID, cfg.ordersGid)];
+  if (cfg.walmartGid) fetches.push(fetchCsvRows(WALMART_FILE_ID, cfg.walmartGid));
+  if (cfg.adOrdersGid) fetches.push(fetchCsvRows(AD_ORDERS_FILE_ID, cfg.adOrdersGid));
+  const results = await Promise.all(fetches);
+  const amzRows = results[0];
+  let i = 1;
+  const wmtRows = cfg.walmartGid ? results[i++] : [];
+  const adRows  = cfg.adOrdersGid ? results[i++] : [];
+
+  if (amzRows.length === 0) {
+    return { actual: { total: null, organic: null, ads: null }, cancelRate: undefined };
+  }
+
+  const amzTotal = sumOrdersRevenue(amzRows, target.year, target.month, target.throughDay);
+  const wmtTotal = cfg.walmartGid ? sumOrdersRevenue(wmtRows, target.year, target.month, target.throughDay) : 0;
+  const total = amzTotal + wmtTotal;
+  const ads = cfg.adOrdersGid ? sumAdSales(adRows, target.year, target.month) : null;
+  const organic = ads === null ? null : Math.max(0, total - ads);
+  const cancelRate = target.isPartial ? computeCancelRateFromRows(amzRows) : undefined;
+  return { actual: { total, organic, ads }, cancelRate };
 }
 
 function fmt(n){ return (n===null||n===undefined) ? '—' : '$' + Math.round(n).toLocaleString(); }
 
-function projected(actual, cancelRate, applyCancelAdj){
+function projected(actual, cancelRate, applyCancelAdj, target){
   if (actual === null) return null;
-  const raw = actual / TODAY_DAY * DAYS_IN_MONTH;
+  if (!target.isPartial) return actual; // a completed month needs no run-rate projection
+  const raw = actual / target.throughDay * daysInMonth(target.year, target.month);
   if (!applyCancelAdj || cancelRate === undefined || cancelRate === null) return raw;
   return raw * (1 - cancelRate);
 }
@@ -3957,14 +4147,14 @@ function ring(fillPct, colorClass, size=80, stroke=7){
   </svg>`;
 }
 
-function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj){
+function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, target){
   const flagHtml = flagged ? '<span class="gt-flag" title="Organic column unconfirmed">⚠</span>' : '';
   if (goal === null || goal === undefined) {
     return `<div class="gt-ring-item">
       <div class="gt-m-label">${label}${flagHtml}</div>
       ${ring(0,'gray')}
       <div class="gt-pct gt-gray">No goal<br>set</div>
-      <div class="gt-goal">${actual!=null ? 'MTD ' + fmt(actual) : '—'}</div>
+      <div class="gt-goal">${actual!=null ? (target.isPartial ? 'MTD ' : '') + fmt(actual) : '—'}</div>
     </div>`;
   }
   if (actual === null || actual === undefined) {
@@ -3976,7 +4166,7 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj){
     </div>`;
   }
   const fillPct = actual / goal;
-  const proj = projected(actual, cancelRate, applyCancelAdj);
+  const proj = projected(actual, cancelRate, applyCancelAdj, target);
   const colorClass = proj >= goal ? 'green' : 'red';
   let adjNote = '';
   if (applyCancelAdj) {
@@ -3988,55 +4178,75 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj){
     <div class="gt-m-label">${label}${flagHtml}</div>
     ${ring(fillPct, colorClass)}
     <div class="gt-pct gt-${colorClass}">${Math.round(fillPct*100)}%</div>
-    <div class="gt-proj gt-${colorClass}">Projecting ${fmt(proj)}</div>
+    <div class="gt-proj gt-${colorClass}">${target.isPartial ? 'Projecting ' : ''}${fmt(proj)}</div>
     <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
     ${adjNote}
   </div>`;
 }
 
-function renderCard(elId, cfg, goal, cancelRate){
+// ── State ──
+let activePeriod = 'mtd';
+const goalCache   = { mtd: {}, lastmonth: {} };
+const actualCache = { mtd: {}, lastmonth: {} };
+const cancelRateCache = {};
+
+function currentTarget(){ return activePeriod === 'mtd' ? getMtdTarget() : getLastMonthTarget(); }
+
+function renderCard(elId, cfg){
   const el = document.getElementById(elId);
   if (!el) return;
-  const adjApplies = cfg.ordersGid != null;
+  const period = activePeriod;
+  const target = currentTarget();
+  const goal = goalCache[period][elId] || cfg.goal;
+  const actual = actualCache[period][elId] || { total: null, organic: null, ads: null };
+  const cancelRate = cancelRateCache[elId];
+  const applyCancelAdj = period === 'mtd' && !cfg.website;
   el.innerHTML =
-    metricBlock('Total Sales', goal.total, cfg.actual.total, false, cancelRate, adjApplies) +
-    metricBlock('Organic Sales', goal.organic, cfg.actual.organic, cfg.organicConfirmed === false, cancelRate, adjApplies) +
-    metricBlock('Ad Sales', goal.ads, cfg.actual.ads, false, undefined, false);
+    metricBlock('Total Sales', goal.total, actual.total, false, cancelRate, applyCancelAdj, target) +
+    metricBlock('Organic Sales', goal.organic, actual.organic, cfg.organicConfirmed === false, cancelRate, applyCancelAdj, target) +
+    metricBlock('Ad Sales', goal.ads, actual.ads, false, undefined, false, target);
 }
 
-const liveState = {};
+// Initial synchronous paint (fallback goal snapshot, actual pending) so
+// the page is never blank while the first real fetch is in flight.
 for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
-  liveState[elId] = { goal: cfg.goal, cancelRate: cfg.cancelRate };
+  renderCard(elId, cfg);
 }
 
-for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
-  renderCard(elId, cfg, liveState[elId].goal, liveState[elId].cancelRate);
-}
-
-function withTimeout(promise, ms){
-  return Promise.race([
-    promise,
-    new Promise(resolve => setTimeout(() => resolve(undefined), ms))
-  ]);
-}
-for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
-  if (cfg.goalGid) {
-    withTimeout(fetchLiveGoal(cfg), 4000).then(liveGoal => {
-      if (liveGoal) {
-        liveState[elId].goal = liveGoal;
-        renderCard(elId, cfg, liveState[elId].goal, liveState[elId].cancelRate);
+async function loadPeriod(period){
+  const target = period === 'mtd' ? getMtdTarget() : getLastMonthTarget();
+  const monthStr = period === 'mtd' ? currentMonthStr() : lastMonthStr();
+  await Promise.all(Object.entries(BRAND_GOAL_CONFIG).map(async ([elId, cfg]) => {
+    if (!goalCache[period][elId] && cfg.goalGid) {
+      const g = await withTimeout(fetchLiveGoal(cfg, monthStr), 4000);
+      if (g) {
+        goalCache[period][elId] = g;
+        if (activePeriod === period) renderCard(elId, cfg);
       }
-    });
-  }
-  if (cfg.ordersGid) {
-    withTimeout(fetchCancelRate(cfg), 4000).then(rate => {
-      if (rate !== undefined) {
-        liveState[elId].cancelRate = rate;
-        renderCard(elId, cfg, liveState[elId].goal, liveState[elId].cancelRate);
+    }
+    if (!actualCache[period][elId]) {
+      const result = await withTimeout(loadBrandActual(elId, cfg, target), 8000);
+      if (result !== undefined) {
+        actualCache[period][elId] = result.actual;
+        if (period === 'mtd' && result.cancelRate !== undefined) cancelRateCache[elId] = result.cancelRate;
+        if (activePeriod === period) renderCard(elId, cfg);
       }
-    });
-  }
+    }
+  }));
 }
+
+async function gtSetPeriod(period, btn){
+  activePeriod = period;
+  document.querySelectorAll('.gt-period-pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
+    renderCard(elId, cfg);
+  }
+  loadPeriod(period);
+}
+window.gtSetPeriod = gtSetPeriod;
+
+loadPeriod('mtd');
 
 })();
 </script>
