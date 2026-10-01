@@ -302,7 +302,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
   display:none; flex:1; overflow-y:auto; background:var(--bg); color:var(--ink);
 }
 #goal-tracker-view.active{ display:block; }
-#goal-tracker-view .gt-wrap{ padding:20px 24px 40px; max-width:1600px; margin:0 auto; }
+#goal-tracker-view .gt-wrap{ padding:20px 24px 40px; max-width:2200px; margin:0 auto; }
 #goal-tracker-view .gt-period-bar{ margin-bottom:16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
 #goal-tracker-view .period-pill-group{ display:inline-flex; background:#fff; border:1px solid #e6e8ee; border-radius:999px; padding:3px; gap:2px; }
 #goal-tracker-view .gt-period-note{ font-size:11.5px; color:#b4780f; background:rgba(200,125,47,0.08); border:1px solid rgba(200,125,47,0.18); border-radius:999px; padding:5px 12px; }
@@ -312,9 +312,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
   border-bottom:1px solid #e0e2e8; padding-bottom:5px;
 }
 #goal-tracker-view .gt-manager-title span{ color:var(--navy); }
-#goal-tracker-view .gt-grid{ display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; }
-@media (max-width: 1400px){ #goal-tracker-view .gt-grid{ grid-template-columns:repeat(4, 1fr); } }
-@media (max-width: 1100px){ #goal-tracker-view .gt-grid{ grid-template-columns:repeat(2, 1fr); } }
+#goal-tracker-view .gt-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(270px, 1fr)); gap:14px; }
 #goal-tracker-view .gt-card{
   background:#fff; border-radius:10px; overflow:hidden;
   box-shadow:0 1px 3px rgba(15,30,61,0.08); border:1px solid #e6e8ee;
@@ -322,27 +320,27 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view .gt-card.gt-wide{ grid-column: span 2; }
 #goal-tracker-view .gt-card.gt-wide .gt-groups-row{ display:flex; gap:0; }
 #goal-tracker-view .gt-card.gt-wide .gt-groups-row .gt-group{ flex:1; margin:0 8px 8px; }
-#goal-tracker-view .gt-card-head{ padding:10px 12px 6px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; }
+#goal-tracker-view .gt-card-head{ padding:12px 14px 7px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; }
 #goal-tracker-view .gt-card-head .gt-name{
   font-family:Georgia,'Times New Roman',serif; font-style:italic; font-weight:700;
-  font-size:15px; color:var(--navy);
+  font-size:17px; color:var(--navy);
 }
-#goal-tracker-view .gt-card-head .gt-chan{ font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+#goal-tracker-view .gt-card-head .gt-chan{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
 #goal-tracker-view .gt-card-note{ margin:0 12px 6px; font-size:9.5px; color:#b4780f; }
-#goal-tracker-view .gt-group{ background:var(--cream); margin:0 8px 8px; border-radius:7px; padding:10px 8px 10px; }
+#goal-tracker-view .gt-group{ background:var(--cream); margin:0 8px 8px; border-radius:7px; padding:14px 10px 12px; }
 #goal-tracker-view .gt-group-label{
   font-family:Georgia,'Times New Roman',serif; font-style:italic; font-weight:700;
-  font-size:12px; color:var(--navy); margin-bottom:1px;
+  font-size:13px; color:var(--navy); margin-bottom:2px;
 }
 #goal-tracker-view .gt-group-note{ font-size:8.5px; color:#8a5a12; margin-bottom:5px; }
 #goal-tracker-view .gt-rings{ display:flex; justify-content:space-between; gap:4px; }
 #goal-tracker-view .gt-ring-item{ text-align:center; flex:1; min-width:0; }
-#goal-tracker-view .gt-ring-item .gt-m-label{ font-size:9px; color:#5a5f72; margin-bottom:3px; }
+#goal-tracker-view .gt-ring-item .gt-m-label{ font-size:11px; color:#5a5f72; margin-bottom:4px; }
 #goal-tracker-view .gt-ring-item svg{ display:block; margin:0 auto; }
-#goal-tracker-view .gt-ring-item .gt-pct{ position:relative; top:-54px; font-weight:700; font-size:14px; color:var(--navy); height:0; }
-#goal-tracker-view .gt-ring-item .gt-pct.gt-flat{ color:#9aa1b1; font-size:8.5px; font-weight:600; }
-#goal-tracker-view .gt-ring-item .gt-goal{ font-size:9px; color:#3d445c; margin-top:1px; }
-#goal-tracker-view .gt-ring-item .gt-proj{ font-size:8px; color:#6b7280; }
+#goal-tracker-view .gt-ring-item .gt-pct{ position:relative; top:-70px; font-weight:700; font-size:18px; color:var(--navy); height:0; }
+#goal-tracker-view .gt-ring-item .gt-pct.gt-flat{ color:#9aa1b1; font-size:10px; font-weight:600; }
+#goal-tracker-view .gt-ring-item .gt-goal{ font-size:11px; color:#3d445c; margin-top:2px; }
+#goal-tracker-view .gt-ring-item .gt-proj{ font-size:10px; color:#6b7280; }
 #goal-tracker-view .gt-ring-item .gt-goal b{ color:var(--navy); }
 #goal-tracker-view .gt-ring-item .gt-flag{
   display:inline-block; margin-left:3px; font-size:9px; color:var(--muted);
@@ -350,9 +348,10 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 }
 #goal-tracker-view .gt-placeholder{
   margin:0 12px 12px; border:1.5px dashed #c7cad4; border-radius:8px;
-  padding:18px 14px; text-align:center; color:#8b90a0; font-size:12.5px; background:#fafafb;
+  padding:34px 16px; text-align:center; color:#8b90a0; font-size:13px; background:#fafafb;
+  min-height:140px; display:flex; flex-direction:column; justify-content:center;
 }
-#goal-tracker-view .gt-placeholder b{ display:block; color:#5a5f72; font-size:13px; margin-bottom:4px; }
+#goal-tracker-view .gt-placeholder b{ display:block; color:#5a5f72; font-size:14px; margin-bottom:5px; }
 #goal-tracker-view .gt-footnote{ max-width:1400px; margin:0 auto 20px; padding:0 16px; font-size:12px; color:var(--muted); }
 #goal-tracker-view .gt-footnote .gt-flag-key{ color:var(--muted); font-weight:700; }
 #goal-tracker-view .gt-pct.gt-green{ color:#0d9b6c; }
@@ -360,7 +359,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view .gt-pct.gt-gray{ color:#9aa1b1; font-size:10px; font-weight:600; }
 #goal-tracker-view .gt-proj.gt-green{ color:#1a9c73; }
 #goal-tracker-view .gt-proj.gt-red{ color:var(--danger); }
-#goal-tracker-view .gt-ring-item .gt-adj-note{ font-size:7.5px; color:#9aa1b1; margin-top:1px; line-height:1.2; }
+#goal-tracker-view .gt-ring-item .gt-adj-note{ font-size:9px; color:#9aa1b1; margin-top:2px; line-height:1.25; }
 </style>
 </head>
 <body>
@@ -3837,7 +3836,7 @@ const EVOLIS_WEB_ADS_GID    = '219707263';
 const BRAND_GOAL_CONFIG = {
   'r-skinuva':    { goalGid:196666138,  goalCols:{total:13, organic:18, ads:26}, goal:{total:186800, organic:76000, ads:46700}, organicConfirmed:true,
                     ordersGid:39113380,   walmartGid:761373905,  adOrdersGid:2118939572 },
-  'r-eraclea':    { goalGid:942935799,  goalCols:{total:14, organic:18, ads:23}, goal:{total:2600,   organic:700,   ads:1667},  organicConfirmed:false,
+  'r-eraclea':    { goalGid:942935799,  goalCols:{total:14, organic:18, ads:24}, goal:{total:2600,   organic:700,   ads:1667},  organicConfirmed:false,
                     ordersGid:1048076976, walmartGid:null,       adOrdersGid:455101955 },
   'r-cosmette':   { goalGid:1084102342, goalCols:{total:14, organic:18, ads:23}, goal:{total:2200,   organic:1900,  ads:300},   organicConfirmed:false,
                     ordersGid:982399951,  walmartGid:null,       adOrdersGid:624747298 },
@@ -3996,16 +3995,21 @@ function sumOrdersRevenue(rows, year, month, throughDay){
 
 // Website (Shopify) orders: order_total repeats the real whole-order
 // total on every line item, so it's set once per order rather than
-// summed across lines. financial_status instead of status/promotion_ids
-// (no Vine on Shopify) — kept: PAID, PARTIALLY_REFUNDED; excluded: REFUNDED.
+// summed across lines. Status filter matches Évolis's own production
+// isValidWebRow() exactly (an exclude-list, not an include-list — the
+// Goal Tracker's earlier header comment paraphrased this as "keep PAID/
+// PARTIALLY_REFUNDED", which is narrower than what the real dashboard
+// code does and would silently undercount any other non-excluded
+// Shopify status, e.g. partially_paid/authorized).
 function sumWebsiteOrdersRevenue(rows, year, month, throughDay){
   const mm = String(month).padStart(2, '0');
   const startStr = `${year}-${mm}-01`;
   const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
   const filtered = rows.filter(r => {
     const d = normalizeDate(r.date);
-    const fs = (r.financial_status || '').toUpperCase();
-    return d && d >= startStr && d <= endStr && (fs === 'PAID' || fs === 'PARTIALLY_REFUNDED');
+    const fs = (r.financial_status || r.status || '').toLowerCase();
+    const valid = fs !== 'refunded' && fs !== 'cancelled' && fs !== 'canceled' && fs !== 'voided';
+    return d && d >= startStr && d <= endStr && valid;
   });
   const orderTotals = {};
   filtered.forEach(r => {
@@ -4131,7 +4135,7 @@ function projected(actual, cancelRate, applyCancelAdj, target){
   return raw * (1 - cancelRate);
 }
 
-function ring(fillPct, colorClass, size=80, stroke=7){
+function ring(fillPct, colorClass, size=104, stroke=9){
   const r=(size-stroke)/2, c=size/2, circ=2*Math.PI*r;
   if (colorClass === 'gray') {
     return `<svg width="${size}" height="${size}"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${stroke}"/></svg>`;
