@@ -302,13 +302,15 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
   display:none; flex:1; overflow-y:auto; background:var(--bg); color:var(--ink);
 }
 #goal-tracker-view.active{ display:block; }
-#goal-tracker-view .gt-wrap{ padding:20px 24px 40px; max-width:2200px; margin:0 auto; }
+#goal-tracker-view .gt-wrap{ padding:20px 24px 40px; }
+#goal-tracker-view .gt-manager-block{ margin-top:28px; }
+#goal-tracker-view .gt-manager-block:first-of-type{ margin-top:0; }
 #goal-tracker-view .gt-period-bar{ margin-bottom:16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
 #goal-tracker-view .period-pill-group{ display:inline-flex; background:#fff; border:1px solid #e6e8ee; border-radius:999px; padding:3px; gap:2px; }
 #goal-tracker-view .gt-period-note{ font-size:11.5px; color:#b4780f; background:rgba(200,125,47,0.08); border:1px solid rgba(200,125,47,0.18); border-radius:999px; padding:5px 12px; }
 #goal-tracker-view .gt-manager-title{
   font-size:11px; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--muted); font-weight:700; margin:0 0 8px 2px;
+  color:var(--muted); font-weight:700; margin:0 0 10px 2px;
   border-bottom:1px solid #e0e2e8; padding-bottom:5px;
 }
 #goal-tracker-view .gt-manager-title span{ color:var(--navy); }
@@ -3820,9 +3822,12 @@ const GOAL_FILE_ID       = '1trsHDgVSLprsOOjOuFWGZRDqVOV-eII3';
 const AMAZON_FILE_ID     = '1SiYu8e2-Pfi14Aiuf6SAFytWVXb4_dtdNFT6wvLFPok';
 const WALMART_FILE_ID    = '1oIZDxN0vSf4nRvE_K95lsNyBWQd4Ef2aARm0RUtvE0Y';
 const AD_ORDERS_FILE_ID  = '1N30haUFZkdv9rrvYuWwUhxEm0z7MGp1bz9F462aF-QI';
+const AMAZON_RETURNS_FILE_ID  = '16mnFaFkTfXS4FzZ2mI5aoDKNrw8FWe8R8IUDnv3FHVs';
+const WALMART_RETURNS_FILE_ID = '1XxYmX0NT-4bqKh4N96zNAPIAzctXDQaK6Yzp6hVWjJc';
 const EVOLIS_WEB_FILE_ID = '1Wyc43am0EIk2OArL2EU8fP-EyHkhz-9-S5tcY3E60zw';
-const EVOLIS_WEB_ORDERS_GID = '597852778';
-const EVOLIS_WEB_ADS_GID    = '219707263';
+const EVOLIS_WEB_ORDERS_GID  = '597852778';
+const EVOLIS_WEB_ADS_GID     = '219707263';
+const EVOLIS_WEB_RETURNS_GID = '1033366681';
 
 /* goal:{...} is the last-known fallback snapshot, used only until the
    live per-month goal fetch resolves (or if it fails outright) — same
@@ -3832,28 +3837,46 @@ const EVOLIS_WEB_ADS_GID    = '219707263';
    brand (Amala). walmartGid is only set for the brands this page's own
    cards label "Amazon + Walmart" — Crème Shop has a Walmart tab in the
    master mapping too, but this page has always shown it as Amazon-only,
-   so that tab is deliberately not blended in here. */
+   so that tab is deliberately not blended in here.
+
+   brandSlug + returns gids added after finding, in Évolis's own real
+   Goal Tracker implementation, that (a) Total Sales nets out returns
+   (amzReturnsMtd/wmtReturnsMtd/webReturnsMtd subtracted, not just gross
+   orders) and (b) returns processing is brand-filtered because those
+   sheets can carry more than one brand's rows even on a brand's own
+   tab. returnsGid/walmartReturnsGid are omitted where the master
+   mapping has no gid for that brand (MiGuard has neither; several
+   Amazon-only brands have no Walmart returns tab at all). */
 const BRAND_GOAL_CONFIG = {
   'r-skinuva':    { goalGid:196666138,  goalCols:{total:13, organic:18, ads:26}, goal:{total:186800, organic:76000, ads:46700}, organicConfirmed:true,
-                    ordersGid:39113380,   walmartGid:761373905,  adOrdersGid:2118939572 },
+                    ordersGid:39113380,   walmartGid:761373905,  adOrdersGid:2118939572, brandSlug:'skinuva',
+                    returnsGid:1829077418, walmartReturnsGid:335941769 },
   'r-eraclea':    { goalGid:942935799,  goalCols:{total:14, organic:18, ads:24}, goal:{total:2600,   organic:700,   ads:1667},  organicConfirmed:false,
-                    ordersGid:1048076976, walmartGid:null,       adOrdersGid:455101955 },
+                    ordersGid:1048076976, walmartGid:null,       adOrdersGid:455101955, brandSlug:'eraclea',
+                    returnsGid:293296204, walmartReturnsGid:null },
   'r-cosmette':   { goalGid:1084102342, goalCols:{total:14, organic:18, ads:23}, goal:{total:2200,   organic:1900,  ads:300},   organicConfirmed:false,
-                    ordersGid:982399951,  walmartGid:null,       adOrdersGid:624747298 },
+                    ordersGid:982399951,  walmartGid:null,       adOrdersGid:624747298, brandSlug:'cosmette',
+                    returnsGid:371406496, walmartReturnsGid:null },
   'r-cloudcafe':  { goalGid:1949875192, goalCols:{total:13, organic:18, ads:24}, goal:{total:11023,  organic:6690,  ads:4333},  organicConfirmed:true,
-                    ordersGid:782298390,  walmartGid:1086554940, adOrdersGid:1235455618 },
+                    ordersGid:782298390,  walmartGid:1086554940, adOrdersGid:1235455618, brandSlug:'cloud-cafe',
+                    returnsGid:null, walmartReturnsGid:1857072850 },
   'r-justbjorn':  { goalGid:333511738,  goalCols:{total:14, organic:18, ads:25}, goal:{total:7948,   organic:5157,  ads:2790},  organicConfirmed:true,
-                    ordersGid:1781575614, walmartGid:686791892,  adOrdersGid:1492792448 },
+                    ordersGid:1781575614, walmartGid:686791892,  adOrdersGid:1492792448, brandSlug:'just-bjorn',
+                    returnsGid:502209052, walmartReturnsGid:null },
   'r-amala':      { goalGid:2031782096, goalCols:{total:14, organic:null, ads:23}, goal:{total:1998, organic:null,  ads:467},   organicConfirmed:null,
-                    ordersGid:1410727505, walmartGid:null,       adOrdersGid:489097625 },
+                    ordersGid:1410727505, walmartGid:null,       adOrdersGid:489097625, brandSlug:'amala',
+                    returnsGid:2009311556, walmartReturnsGid:null },
   'r-cremeshop':  { goalGid:521249346,  goalCols:{total:13, organic:18, ads:25}, goal:{total:19708,  organic:14708, ads:5000},  organicConfirmed:true,
-                    ordersGid:1259265896, walmartGid:null,       adOrdersGid:414661274 },
+                    ordersGid:1259265896, walmartGid:null,       adOrdersGid:414661274, brandSlug:'creme-shop',
+                    returnsGid:1558067719, walmartReturnsGid:null },
   'r-evolis-aw':  { goalGid:154860784,  goalCols:{total:14, organic:19, ads:29}, goal:{total:4267,   organic:3100,  ads:1167},  organicConfirmed:true,
-                    ordersGid:1163928587, walmartGid:1844526926, adOrdersGid:158578426 },
+                    ordersGid:1163928587, walmartGid:1844526926, adOrdersGid:158578426, brandSlug:'evolis',
+                    returnsGid:267551179, walmartReturnsGid:344983459 },
   'r-evolis-web': { goalGid:1655791223, goalCols:{total:14, organic:19, ads:29}, goal:{total:1075,   organic:1075,  ads:null},  organicConfirmed:true,
-                    website:true },
+                    website:true, brandSlug:'evolis' },
   'r-miguard':    { goalGid:332019976,  goalCols:{total:13, organic:16, ads:23}, goal:{total:3047,   organic:2157,  ads:890},   organicConfirmed:true,
-                    ordersGid:1608462008, walmartGid:null,       adOrdersGid:862206070 },
+                    ordersGid:1608462008, walmartGid:null,       adOrdersGid:862206070, brandSlug:'miguard',
+                    returnsGid:null, walmartReturnsGid:null },
   'r-pbj':        { goalGid:1675074463, goalCols:{total:14, organic:18, ads:25}, goal:{total:2031,   organic:475,   ads:1556},  organicConfirmed:true,
                     // ordersGid reverted to the original value — switching it to the
                     // Dashboard Mapping's 1150392606 (two turns ago) coincides exactly
@@ -3861,9 +3884,11 @@ const BRAND_GOAL_CONFIG = {
                     // rings), strong evidence that gid is wrong/inaccessible on this
                     // file. Can't verify either number against the live sheet from
                     // here — worth confirming which is actually correct.
-                    ordersGid:1152606039, walmartGid:96465947,   adOrdersGid:863329955 },
+                    ordersGid:1152606039, walmartGid:96465947,   adOrdersGid:863329955, brandSlug:'pbj',
+                    returnsGid:759491268, walmartReturnsGid:11317223 },
   'r-skinside':   { goalGid:1677661344, goalCols:{total:15, organic:18, ads:27}, goal:{total:300,    organic:300,   ads:null},  organicConfirmed:true,
-                    ordersGid:545265606,  walmartGid:null,       adOrdersGid:1620705430 },
+                    ordersGid:545265606,  walmartGid:null,       adOrdersGid:1620705430, brandSlug:'skinside-seoul',
+                    returnsGid:1821371815, walmartReturnsGid:null },
 };
 
 // ── CSV helpers ──
@@ -3979,6 +4004,16 @@ function isGoalsValidRow(row){
   return true;
 }
 
+// Returns/Website sheets can carry more than one brand's rows even on
+// what looks like a brand-specific tab — matches Évolis's own real Goal
+// Tracker, which brand-filters returns processing for exactly this
+// reason. brandSlug is omitted (no-op, returns true) for callers that
+// don't have one.
+function isBrandRow(row, brandSlug){
+  if (!brandSlug) return true;
+  return (row.brand || '').toLowerCase().trim() === brandSlug;
+}
+
 // Sums $ revenue for Amazon/Walmart order-cache rows (same column shape)
 // within [year-month-01, year-month-throughDay]. Groups by order_id first
 // (summing item_price across that order's line items), then sums across
@@ -3999,6 +4034,55 @@ function sumOrdersRevenue(rows, year, month, throughDay){
   return Object.values(orderTotals).reduce((s, v) => s + v, 0);
 }
 
+// Amazon's FBA Returns report tracks units only — no dollar column at
+// all. Each return's $ impact is estimated as (returned quantity × that
+// ASIN's average item_price from the Amazon Orders rows already
+// fetched), same approximation Évolis's own real dashboard uses, built
+// from the same already-fetched rows rather than a second source.
+function buildAsinPriceMap(orderRows){
+  const sums = {}, counts = {};
+  orderRows.forEach(r => {
+    const asin = (r.asin || '').trim().toUpperCase();
+    const price = parseAmt(r.item_price);
+    if (!asin || !price) return;
+    sums[asin] = (sums[asin] || 0) + price;
+    counts[asin] = (counts[asin] || 0) + 1;
+  });
+  const avg = {};
+  Object.keys(sums).forEach(k => { avg[k] = sums[k] / counts[k]; });
+  return avg;
+}
+function sumAmazonReturns(returnsRows, priceByAsin, brandSlug, year, month, throughDay){
+  const mm = String(month).padStart(2, '0');
+  const startStr = `${year}-${mm}-01`;
+  const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
+  let total = 0;
+  returnsRows.forEach(r => {
+    if (!isBrandRow(r, brandSlug)) return;
+    const d = normalizeDate(r.return_date);
+    if (!d || d < startStr || d > endStr) return;
+    const asin = (r.asin || '').trim().toUpperCase();
+    const qty = parseInt(r.quantity, 10) || 0;
+    total += qty * (priceByAsin[asin] || 0);
+  });
+  return total;
+}
+// Walmart/Website returns both carry a direct refund_amount — no price
+// lookup needed, unlike Amazon's.
+function sumDirectReturns(returnsRows, brandSlug, dateField, year, month, throughDay){
+  const mm = String(month).padStart(2, '0');
+  const startStr = `${year}-${mm}-01`;
+  const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
+  let total = 0;
+  returnsRows.forEach(r => {
+    if (!isBrandRow(r, brandSlug)) return;
+    const d = normalizeDate(r[dateField]);
+    if (!d || d < startStr || d > endStr) return;
+    total += parseAmt(r.refund_amount);
+  });
+  return total;
+}
+
 // Website (Shopify) orders: order_total repeats the real whole-order
 // total on every line item, so it's set once per order rather than
 // summed across lines. Status filter matches Évolis's own production
@@ -4007,11 +4091,12 @@ function sumOrdersRevenue(rows, year, month, throughDay){
 // PARTIALLY_REFUNDED", which is narrower than what the real dashboard
 // code does and would silently undercount any other non-excluded
 // Shopify status, e.g. partially_paid/authorized).
-function sumWebsiteOrdersRevenue(rows, year, month, throughDay){
+function sumWebsiteOrdersRevenue(rows, brandSlug, year, month, throughDay){
   const mm = String(month).padStart(2, '0');
   const startStr = `${year}-${mm}-01`;
   const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
   const filtered = rows.filter(r => {
+    if (!isBrandRow(r, brandSlug)) return false;
     const d = normalizeDate(r.date);
     const fs = (r.financial_status || r.status || '').toLowerCase();
     const valid = fs !== 'refunded' && fs !== 'cancelled' && fs !== 'canceled' && fs !== 'voided';
@@ -4098,21 +4183,25 @@ function withTimeout(promise, ms){
 // as $0, never silently blank.
 async function loadBrandActual(elId, cfg, target){
   if (cfg.website) {
-    const ordersRows = await fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ORDERS_GID);
+    // Per Jaclyn: the real évolis dashboard's "Organic = Total" for
+    // Website is itself a mistake there, not something to match. Back
+    // to computing Ads from the ads tab's `revenue` column (summed one
+    // value per date, since it repeats as a site-wide daily total —
+    // see sumWebsiteAdsRevenue), with Organic = Total − Ads. Returns
+    // netting removed per her last message — Total is gross order
+    // revenue, brand-filtered to évolis, for whichever month (target.year/
+    // target.month) is currently selected — MTD or Last Month, both go
+    // through the same date-scoped sum, nothing hardcoded to "this
+    // month" only.
+    const [ordersRows, adsRows] = await Promise.all([
+      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ORDERS_GID),
+      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ADS_GID),
+    ]);
     if (ordersRows.length === 0) return { actual: { total: null, organic: null, ads: null }, cancelRate: undefined };
-    const total = sumWebsiteOrdersRevenue(ordersRows, target.year, target.month, target.throughDay);
-    // Ads/Organic deliberately NOT computed from the ads tab's `revenue`
-    // column — verified against a real export that it's ~98% of total
-    // site revenue (a broad Google Ads "all conversions" value, not true
-    // ad-attributed dollars), while the real dashboard's own unit-level
-    // split shows ads at only ~17% of units. Subtracting that revenue
-    // figure from Total was collapsing Organic to near-zero. No other
-    // sheet here gives a trustworthy dollar-level ad attribution (the
-    // shopping tab's conversions_value is far too small to be it), so
-    // these stay "Not available yet" rather than show a number derived
-    // from a column that's already been shown not to mean what it looks
-    // like it means.
-    return { actual: { total, organic: null, ads: null }, cancelRate: undefined };
+    const total = sumWebsiteOrdersRevenue(ordersRows, cfg.brandSlug, target.year, target.month, target.throughDay);
+    const ads = adsRows.length ? sumWebsiteAdsRevenue(adsRows, target.year, target.month, target.throughDay) : 0;
+    const organic = Math.max(0, total - ads);
+    return { actual: { total, organic, ads }, cancelRate: undefined };
   }
 
   const fetches = [fetchCsvRows(AMAZON_FILE_ID, cfg.ordersGid)];
