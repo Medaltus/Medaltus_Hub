@@ -3968,20 +3968,39 @@ function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 // Retries on a 429 specifically (Google's CSV export endpoint rate-limits
 // bursts of concurrent requests) — up to 2 retries with increasing delay.
 // Any other non-ok status still fails immediately, same as before.
-async function fetchCsvRows(fileId, gid){
-  if (!gid) return [];
+// label is for console diagnostics only (e.g. "skinuva/amazon") — never
+// affects behavior, just makes a real failure visible instead of silently
+// collapsing to "Not available yet" with no trace of why.
+async function fetchCsvRows(fileId, gid, label){
+  const tag = '[GoalTracker][debug]' + (label ? ' ' + label : '');
+  if (!gid) {
+    console.log(tag, 'skipped — no gid configured');
+    return [];
+  }
   const url = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&gid=${gid}&_cb=${Date.now()}`;
   for (let attempt = 0; attempt <= 2; attempt++) {
     try {
       const res = await fetch(url);
       if (res.status === 429) {
+        console.log(tag, `429 rate-limited (attempt ${attempt + 1}/3)`, url);
         if (attempt < 2) { await sleep(600 * (attempt + 1)); continue; }
+        console.warn(tag, 'gave up after 3 attempts, all 429 — returning empty');
         return [];
       }
-      if (!res.ok) return [];
+      if (!res.ok) {
+        console.warn(tag, `fetch failed, status ${res.status}`, url);
+        return [];
+      }
       const text = await res.text();
-      return isCsvText(text) ? parseCsvObjects(text) : [];
+      if (!isCsvText(text)) {
+        console.warn(tag, 'response was not CSV-shaped (likely an HTML error page or empty body) — first 120 chars:', text.slice(0, 120));
+        return [];
+      }
+      const rows = parseCsvObjects(text);
+      console.log(tag, `OK — ${rows.length} row(s)`);
+      return rows;
     } catch (e) {
+      console.warn(tag, 'threw:', e.message, url);
       return [];
     }
   }
@@ -4209,19 +4228,23 @@ async function loadBrandActual(elId, cfg, target){
     // through the same date-scoped sum, nothing hardcoded to "this
     // month" only.
     const [ordersRows, adsRows] = await Promise.all([
-      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ORDERS_GID),
-      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ADS_GID),
+      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ORDERS_GID, `${elId}/web-orders`),
+      fetchCsvRows(EVOLIS_WEB_FILE_ID, EVOLIS_WEB_ADS_GID, `${elId}/web-ads`),
     ]);
-    if (ordersRows.length === 0) return { actual: { total: null, organic: null, ads: null }, cancelRate: undefined };
+    if (ordersRows.length === 0) {
+      console.warn(`[GoalTracker][debug] ${elId}: web-orders came back empty — actual will show "Not available yet"`);
+      return { actual: { total: null, organic: null, ads: null }, cancelRate: undefined };
+    }
     const total = sumWebsiteOrdersRevenue(ordersRows, cfg.brandSlug, target.year, target.month, target.throughDay);
     const ads = adsRows.length ? sumWebsiteAdsRevenue(adsRows, target.year, target.month, target.throughDay) : 0;
     const organic = Math.max(0, total - ads);
+    console.log(`[GoalTracker][debug] ${elId}: total=${total} ads=${ads} organic=${organic} (brandSlug="${cfg.brandSlug}", ${ordersRows.length} order rows, ${adsRows.length} ad rows)`);
     return { actual: { total, organic, ads }, cancelRate: undefined };
   }
 
-  const fetches = [fetchCsvRows(AMAZON_FILE_ID, cfg.ordersGid)];
-  if (cfg.walmartGid) fetches.push(fetchCsvRows(WALMART_FILE_ID, cfg.walmartGid));
-  if (cfg.adOrdersGid) fetches.push(fetchCsvRows(AD_ORDERS_FILE_ID, cfg.adOrdersGid));
+  const fetches = [fetchCsvRows(AMAZON_FILE_ID, cfg.ordersGid, `${elId}/amazon`)];
+  if (cfg.walmartGid) fetches.push(fetchCsvRows(WALMART_FILE_ID, cfg.walmartGid, `${elId}/walmart`));
+  if (cfg.adOrdersGid) fetches.push(fetchCsvRows(AD_ORDERS_FILE_ID, cfg.adOrdersGid, `${elId}/ads`));
   const results = await Promise.all(fetches);
   const amzRows = results[0];
   let i = 1;
@@ -4229,6 +4252,7 @@ async function loadBrandActual(elId, cfg, target){
   const adRows  = cfg.adOrdersGid ? results[i++] : [];
 
   if (amzRows.length === 0) {
+    console.warn(`[GoalTracker][debug] ${elId}: Amazon orders (gid ${cfg.ordersGid}) came back empty — actual will show "Not available yet" for all three rings`);
     return { actual: { total: null, organic: null, ads: null }, cancelRate: undefined };
   }
 
@@ -4238,6 +4262,7 @@ async function loadBrandActual(elId, cfg, target){
   const ads = cfg.adOrdersGid ? sumAdSales(adRows, target.year, target.month) : null;
   const organic = ads === null ? null : Math.max(0, total - ads);
   const cancelRate = target.isPartial ? computeCancelRateFromRows(amzRows) : undefined;
+  console.log(`[GoalTracker][debug] ${elId}: amzTotal=${amzTotal} wmtTotal=${wmtTotal} total=${total} ads=${ads} organic=${organic} cancelRate=${cancelRate} (${amzRows.length} amz rows, ${wmtRows.length} wmt rows, ${adRows.length} ad rows, target=${target.year}-${target.month} thru ${target.throughDay})`);
   return { actual: { total, organic, ads }, cancelRate };
 }
 
@@ -4336,6 +4361,8 @@ for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
 async function loadPeriod(period){
   const target = period === 'mtd' ? getMtdTarget() : getLastMonthTarget();
   const monthStr = period === 'mtd' ? currentMonthStr() : lastMonthStr();
+  console.log(`[GoalTracker][debug] ===== loadPeriod("${period}") starting — target=${target.year}-${target.month} thru ${target.throughDay}, isPartial=${target.isPartial} =====`);
+  const outcomes = [];
   await Promise.all(Object.entries(BRAND_GOAL_CONFIG).map(async ([elId, cfg], i) => {
     // Staggered start — each brand can fire off 2-3 sheet requests at
     // once (goal + orders + walmart + ads), so starting all 12 brands
@@ -4347,17 +4374,28 @@ async function loadPeriod(period){
       if (g) {
         goalCache[period][elId] = g;
         if (activePeriod === period) renderCard(elId, cfg);
+      } else {
+        console.warn(`[GoalTracker][debug] ${elId}: live goal fetch timed out or returned nothing — falling back to the snapshot goal baked into BRAND_GOAL_CONFIG`);
       }
     }
     if (!actualCache[period][elId]) {
-      const result = await withTimeout(loadBrandActual(elId, cfg, target), 8000);
+      // Widened from 8s — stagger (up to ~2s for the last brand) plus
+      // up to two 429 retries (600ms+1200ms per affected fetch) can eat
+      // well into an 8s budget for brands later in the queue, causing a
+      // false timeout even when the fetch would have succeeded.
+      const result = await withTimeout(loadBrandActual(elId, cfg, target), 14000);
       if (result !== undefined) {
         actualCache[period][elId] = result.actual;
         if (period === 'mtd' && result.cancelRate !== undefined) cancelRateCache[elId] = result.cancelRate;
         if (activePeriod === period) renderCard(elId, cfg);
+        outcomes.push(`${elId}: total=${result.actual.total}`);
+      } else {
+        console.warn(`[GoalTracker][debug] ${elId}: loadBrandActual did not finish within 14s — stuck on "Not available yet"`);
+        outcomes.push(`${elId}: TIMED OUT`);
       }
     }
   }));
+  console.log(`[GoalTracker][debug] ===== loadPeriod("${period}") finished =====`, outcomes);
 }
 
 async function gtSetPeriod(period, btn){
