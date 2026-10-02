@@ -3965,53 +3965,37 @@ function getLastMonthTarget(){
 
 function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 
-// Retries on EITHER a 429 response OR a thrown fetch error — confirmed via
-// console that "Failed to fetch" (a network-level failure, no HTTP
-// response at all — likely a connection reset under load, since many
-// brands share the same handful of underlying Google Sheets documents,
-// just different gids/tabs within them) happens here too, not just a
-// clean 429 status. The earlier version only retried the 429 case, so a
-// thrown error got zero retries and failed outright on the first hit —
-// this was very likely the actual cause of most brands going blank.
-// label is for console diagnostics only (e.g. "skinuva/amazon") — never
-// affects behavior, just makes a real failure visible instead of silently
-// collapsing to "Not available yet" with no trace of why.
+// REVERTED — the retry-with-backoff version (429 + thrown-error retries,
+// staggered brand starts) turned out to be the actual regression, not a
+// fix. Confirmed against two file versions Jaclyn had saved that worked
+// fine: both used this exact plain, non-retrying fetch with no stagger
+// at all (all 12 brands firing simultaneously). Back to that. Kept only
+// the label param + console logging below — purely diagnostic, doesn't
+// change timing or behavior, so it's safe to leave in.
 async function fetchCsvRows(fileId, gid, label){
   const tag = '[GoalTracker][debug]' + (label ? ' ' + label : '');
   if (!gid) {
     console.log(tag, 'skipped — no gid configured');
     return [];
   }
-  const url = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&gid=${gid}&_cb=${Date.now()}`;
-  for (let attempt = 0; attempt <= 2; attempt++) {
-    try {
-      const res = await fetch(url);
-      if (res.status === 429) {
-        console.log(tag, `429 rate-limited (attempt ${attempt + 1}/3)`, url);
-        if (attempt < 2) { await sleep(700 * (attempt + 1)); continue; }
-        console.warn(tag, 'gave up after 3 attempts, all 429 — returning empty');
-        return [];
-      }
-      if (!res.ok) {
-        console.warn(tag, `fetch failed, status ${res.status}`, url);
-        return [];
-      }
-      const text = await res.text();
-      if (!isCsvText(text)) {
-        console.warn(tag, 'response was not CSV-shaped (likely an HTML error page or empty body) — first 120 chars:', text.slice(0, 120));
-        return [];
-      }
-      const rows = parseCsvObjects(text);
-      console.log(tag, `OK — ${rows.length} row(s)${attempt > 0 ? ` (succeeded on retry ${attempt + 1})` : ''}`);
-      return rows;
-    } catch (e) {
-      console.warn(tag, `threw (attempt ${attempt + 1}/3): ${e.message}`, url);
-      if (attempt < 2) { await sleep(700 * (attempt + 1)); continue; }
-      console.warn(tag, 'gave up after 3 attempts, all threw — returning empty');
+  try {
+    const res = await fetch(`https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&gid=${gid}&_cb=${Date.now()}`);
+    if (!res.ok) {
+      console.warn(tag, `fetch failed, status ${res.status}`);
       return [];
     }
+    const text = await res.text();
+    if (!isCsvText(text)) {
+      console.warn(tag, 'response was not CSV-shaped (likely an HTML error page or empty body) — first 120 chars:', text.slice(0, 120));
+      return [];
+    }
+    const rows = parseCsvObjects(text);
+    console.log(tag, `OK — ${rows.length} row(s)`);
+    return rows;
+  } catch (e) {
+    console.warn(tag, 'threw:', e.message);
+    return [];
   }
-  return [];
 }
 async function fetchLiveGoal(cfg, monthStr){
   if (!cfg.goalGid) return null;
@@ -4370,12 +4354,10 @@ async function loadPeriod(period){
   const monthStr = period === 'mtd' ? currentMonthStr() : lastMonthStr();
   console.log(`[GoalTracker][debug] ===== loadPeriod("${period}") starting — target=${target.year}-${target.month} thru ${target.throughDay}, isPartial=${target.isPartial} =====`);
   const outcomes = [];
-  await Promise.all(Object.entries(BRAND_GOAL_CONFIG).map(async ([elId, cfg], i) => {
-    // Staggered start — each brand can fire off 2-3 sheet requests at
-    // once (goal + orders + walmart + ads), so starting all 12 brands
-    // simultaneously means ~30 concurrent requests to Google's CSV
-    // export endpoint, which rate-limits bursts like that (429s).
-    await sleep(i * 350);
+  // REVERTED — no stagger, plain 8s timeout, all brands fire at once.
+  // Confirmed against two saved-working file versions that this was
+  // never the problem; the stagger/retry logic added afterward was.
+  await Promise.all(Object.entries(BRAND_GOAL_CONFIG).map(async ([elId, cfg]) => {
     if (!goalCache[period][elId] && cfg.goalGid) {
       const g = await withTimeout(fetchLiveGoal(cfg, monthStr), 4000);
       if (g) {
@@ -4386,18 +4368,14 @@ async function loadPeriod(period){
       }
     }
     if (!actualCache[period][elId]) {
-      // Widened from 8s — stagger (up to ~2s for the last brand) plus
-      // up to two 429 retries (600ms+1200ms per affected fetch) can eat
-      // well into an 8s budget for brands later in the queue, causing a
-      // false timeout even when the fetch would have succeeded.
-      const result = await withTimeout(loadBrandActual(elId, cfg, target), 20000);
+      const result = await withTimeout(loadBrandActual(elId, cfg, target), 8000);
       if (result !== undefined) {
         actualCache[period][elId] = result.actual;
         if (period === 'mtd' && result.cancelRate !== undefined) cancelRateCache[elId] = result.cancelRate;
         if (activePeriod === period) renderCard(elId, cfg);
         outcomes.push(`${elId}: total=${result.actual.total}`);
       } else {
-        console.warn(`[GoalTracker][debug] ${elId}: loadBrandActual did not finish within 14s — stuck on "Not available yet"`);
+        console.warn(`[GoalTracker][debug] ${elId}: loadBrandActual did not finish within 8s — stuck on "Not available yet"`);
         outcomes.push(`${elId}: TIMED OUT`);
       }
     }
