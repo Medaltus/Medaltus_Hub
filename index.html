@@ -3963,16 +3963,29 @@ function getLastMonthTarget(){
   return { year, month, throughDay: daysInMonth(year, month), isPartial: false };
 }
 
+function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+// Retries on a 429 specifically (Google's CSV export endpoint rate-limits
+// bursts of concurrent requests) — up to 2 retries with increasing delay.
+// Any other non-ok status still fails immediately, same as before.
 async function fetchCsvRows(fileId, gid){
   if (!gid) return [];
-  try {
-    const res = await fetch(`https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&gid=${gid}&_cb=${Date.now()}`);
-    if (!res.ok) return [];
-    const text = await res.text();
-    return isCsvText(text) ? parseCsvObjects(text) : [];
-  } catch (e) {
-    return [];
+  const url = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=csv&gid=${gid}&_cb=${Date.now()}`;
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.status === 429) {
+        if (attempt < 2) { await sleep(600 * (attempt + 1)); continue; }
+        return [];
+      }
+      if (!res.ok) return [];
+      const text = await res.text();
+      return isCsvText(text) ? parseCsvObjects(text) : [];
+    } catch (e) {
+      return [];
+    }
   }
+  return [];
 }
 async function fetchLiveGoal(cfg, monthStr){
   if (!cfg.goalGid) return null;
@@ -4323,7 +4336,12 @@ for (const [elId, cfg] of Object.entries(BRAND_GOAL_CONFIG)) {
 async function loadPeriod(period){
   const target = period === 'mtd' ? getMtdTarget() : getLastMonthTarget();
   const monthStr = period === 'mtd' ? currentMonthStr() : lastMonthStr();
-  await Promise.all(Object.entries(BRAND_GOAL_CONFIG).map(async ([elId, cfg]) => {
+  await Promise.all(Object.entries(BRAND_GOAL_CONFIG).map(async ([elId, cfg], i) => {
+    // Staggered start — each brand can fire off 2-3 sheet requests at
+    // once (goal + orders + walmart + ads), so starting all 12 brands
+    // simultaneously means ~30 concurrent requests to Google's CSV
+    // export endpoint, which rate-limits bursts like that (429s).
+    await sleep(i * 180);
     if (!goalCache[period][elId] && cfg.goalGid) {
       const g = await withTimeout(fetchLiveGoal(cfg, monthStr), 4000);
       if (g) {
