@@ -3965,9 +3965,14 @@ function getLastMonthTarget(){
 
 function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 
-// Retries on a 429 specifically (Google's CSV export endpoint rate-limits
-// bursts of concurrent requests) — up to 2 retries with increasing delay.
-// Any other non-ok status still fails immediately, same as before.
+// Retries on EITHER a 429 response OR a thrown fetch error — confirmed via
+// console that "Failed to fetch" (a network-level failure, no HTTP
+// response at all — likely a connection reset under load, since many
+// brands share the same handful of underlying Google Sheets documents,
+// just different gids/tabs within them) happens here too, not just a
+// clean 429 status. The earlier version only retried the 429 case, so a
+// thrown error got zero retries and failed outright on the first hit —
+// this was very likely the actual cause of most brands going blank.
 // label is for console diagnostics only (e.g. "skinuva/amazon") — never
 // affects behavior, just makes a real failure visible instead of silently
 // collapsing to "Not available yet" with no trace of why.
@@ -3983,7 +3988,7 @@ async function fetchCsvRows(fileId, gid, label){
       const res = await fetch(url);
       if (res.status === 429) {
         console.log(tag, `429 rate-limited (attempt ${attempt + 1}/3)`, url);
-        if (attempt < 2) { await sleep(600 * (attempt + 1)); continue; }
+        if (attempt < 2) { await sleep(700 * (attempt + 1)); continue; }
         console.warn(tag, 'gave up after 3 attempts, all 429 — returning empty');
         return [];
       }
@@ -3997,10 +4002,12 @@ async function fetchCsvRows(fileId, gid, label){
         return [];
       }
       const rows = parseCsvObjects(text);
-      console.log(tag, `OK — ${rows.length} row(s)`);
+      console.log(tag, `OK — ${rows.length} row(s)${attempt > 0 ? ` (succeeded on retry ${attempt + 1})` : ''}`);
       return rows;
     } catch (e) {
-      console.warn(tag, 'threw:', e.message, url);
+      console.warn(tag, `threw (attempt ${attempt + 1}/3): ${e.message}`, url);
+      if (attempt < 2) { await sleep(700 * (attempt + 1)); continue; }
+      console.warn(tag, 'gave up after 3 attempts, all threw — returning empty');
       return [];
     }
   }
@@ -4368,7 +4375,7 @@ async function loadPeriod(period){
     // once (goal + orders + walmart + ads), so starting all 12 brands
     // simultaneously means ~30 concurrent requests to Google's CSV
     // export endpoint, which rate-limits bursts like that (429s).
-    await sleep(i * 180);
+    await sleep(i * 350);
     if (!goalCache[period][elId] && cfg.goalGid) {
       const g = await withTimeout(fetchLiveGoal(cfg, monthStr), 4000);
       if (g) {
@@ -4383,7 +4390,7 @@ async function loadPeriod(period){
       // up to two 429 retries (600ms+1200ms per affected fetch) can eat
       // well into an 8s budget for brands later in the queue, causing a
       // false timeout even when the fetch would have succeeded.
-      const result = await withTimeout(loadBrandActual(elId, cfg, target), 14000);
+      const result = await withTimeout(loadBrandActual(elId, cfg, target), 20000);
       if (result !== undefined) {
         actualCache[period][elId] = result.actual;
         if (period === 'mtd' && result.cancelRate !== undefined) cancelRateCache[elId] = result.cancelRate;
