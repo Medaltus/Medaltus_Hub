@@ -4110,19 +4110,21 @@ function sumWebsiteOrdersRevenue(rows, brandSlug, year, month, throughDay){
   return Object.values(orderTotals).reduce((s, v) => s + v, 0);
 }
 
-// Website (Google Ads) daily revenue is a site-wide total repeated on
-// every campaign row for that date — take one value per date, not
-// summed per campaign (else it multiplies by however many campaigns ran).
+// Website (Google Ads) revenue — CHANGED per Jaclyn (the Google Ads cron
+// was fixed the same day): each row now holds that campaign's OWN
+// revenue, not a site-wide daily total repeated on every row. Sum every
+// row in range; the old one-value-per-date dedup would now silently
+// drop every campaign after the first on any day running more than one.
 function sumWebsiteAdsRevenue(rows, year, month, throughDay){
   const mm = String(month).padStart(2, '0');
   const startStr = `${year}-${mm}-01`;
   const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
-  const seenDates = {};
-  rows.forEach(r => {
-    const d = normalizeDate(r.date);
-    if (d && d >= startStr && d <= endStr && !(d in seenDates)) seenDates[d] = parseAmt(r.revenue);
-  });
-  return Object.values(seenDates).reduce((s, v) => s + v, 0);
+  return rows
+    .filter(r => {
+      const d = normalizeDate(r.date);
+      return d && d >= startStr && d <= endStr;
+    })
+    .reduce((s, r) => s + parseAmt(r.revenue), 0);
 }
 
 // Ad Orders Cache — already pre-aggregated by (year, month, asin); sum
