@@ -357,7 +357,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view .gt-ring-item.gt-sm .gt-m-label{ font-size:11.5px; color:#6b7080; }
 #goal-tracker-view .gt-ring-wrap{ position:relative; margin:0 auto; aspect-ratio:1; }
 #goal-tracker-view .gt-ring-wrap svg{ display:block; width:100%; height:100%; }
-#goal-tracker-view .gt-lg .gt-ring-wrap svg circle:first-child{ stroke:#fff; } /* white track on the Total Sales ring so it pops against the tan card */
+#goal-tracker-view .gt-lg .gt-ring-wrap svg circle:first-child{ fill:#fff; } /* grey track as before, but a white center behind the Total Sales % so it pops against the tan card */
 #goal-tracker-view .gt-sm .gt-arc{ opacity:0.62; filter:saturate(0.7); } /* duller green/red on Organic + Ad rings so they pop less; track stays fully visible */
 #goal-tracker-view .gt-sm .gt-pct.gt-green, #goal-tracker-view .gt-sm .gt-pct.gt-red, #goal-tracker-view .gt-sm .gt-proj.gt-green, #goal-tracker-view .gt-sm .gt-proj.gt-red{ opacity:0.78; }
 /* ring sizes scale with the card's own width (container query units) so the
@@ -395,6 +395,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view .gt-pct.gt-gray{ color:#9aa1b1; font-weight:600; }
 #goal-tracker-view .gt-proj.gt-green{ color:#1a9c73; }
 #goal-tracker-view .gt-proj.gt-red{ color:var(--danger); }
+#goal-tracker-view .gt-proj.gt-neutral{ color:#1a1d29; }
 #goal-tracker-view .gt-ring-item .gt-adj-note{ white-space:nowrap; font-size:9px; color:#9aa1b1; margin-top:2px; line-height:1.25; }
 </style>
 </head>
@@ -4329,10 +4330,25 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
   const wrap = (svg, pctHtml) =>
     `<div class="gt-ring-wrap">${svg}${pctHtml}</div>`;
   if (goal === null || goal === undefined) {
+    // No goal: still show the projection (black, since there's nothing to
+    // compare it to), so the month's run-rate is visible regardless.
+    let projRow = '<div class="gt-proj gt-neutral">—</div>';
+    let noGoalAdj = '';
+    if (actual !== null && actual !== undefined) {
+      const projNG = projected(actual, cancelRate, applyCancelAdj, target);
+      projRow = `<div class="gt-proj gt-neutral">${target.isPartial ? 'Projecting ' : ''}${fmt(projNG)}</div>`;
+      if (applyCancelAdj) {
+        noGoalAdj = cancelRate != null
+          ? `<div class="gt-adj-note">adj. ${Math.round(cancelRate*100)}% cancel rate</div>`
+          : `<div class="gt-adj-note">no cancel history</div>`;
+      }
+    }
     return `<div class="gt-ring-item gt-${tier}">
       <div class="gt-m-label">${label}${flagHtml}</div>
       ${wrap(ring(0,'gray',size,stroke), '<div class="gt-pct gt-gray">No goal<br>set</div>')}
-      <div class="gt-goal">${actual!=null ? (target.isPartial ? 'MTD ' : '') + fmt(actual) : '—'}</div>
+      ${projRow}
+      <div class="gt-goal">Goal <b>—</b></div>
+      ${noGoalAdj}
     </div>`;
   }
   if (actual === null || actual === undefined) {
