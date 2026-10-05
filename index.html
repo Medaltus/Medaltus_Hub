@@ -357,7 +357,12 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view .gt-ring-item.gt-sm .gt-m-label{ font-size:11.5px; color:#6b7080; }
 #goal-tracker-view .gt-ring-wrap{ position:relative; margin:0 auto; aspect-ratio:1; }
 #goal-tracker-view .gt-ring-wrap svg{ display:block; width:100%; height:100%; }
-#goal-tracker-view .gt-lg .gt-ring-wrap svg circle:first-child{ fill:#fff; } /* grey track as before, but a white center behind the Total Sales % so it pops against the tan card */
+/* Total Sales ring: white track, and a light tint inside the circle —
+   light green when projecting to hit goal, light red when not, white when
+   there's no goal / no data yet */
+#goal-tracker-view .gt-lg .gt-ring-wrap svg circle:first-child{ stroke:#fff; fill:#fff; }
+#goal-tracker-view .gt-lg .gt-ring-wrap.gt-state-green svg circle:first-child{ fill:#dcf5ea; }
+#goal-tracker-view .gt-lg .gt-ring-wrap.gt-state-red svg circle:first-child{ fill:#fbe3df; }
 #goal-tracker-view .gt-sm .gt-arc{ opacity:0.62; filter:saturate(0.7); } /* duller green/red on Organic + Ad rings so they pop less; track stays fully visible */
 #goal-tracker-view .gt-sm .gt-pct.gt-green, #goal-tracker-view .gt-sm .gt-pct.gt-red, #goal-tracker-view .gt-sm .gt-proj.gt-green, #goal-tracker-view .gt-sm .gt-proj.gt-red{ opacity:0.78; }
 /* ring sizes scale with the card's own width (container query units) so the
@@ -4327,8 +4332,8 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
   const size = tier === 'lg' ? 168 : 106;
   const stroke = tier === 'lg' ? 13 : 9;
   const flagHtml = flagged ? '<span class="gt-flag" title="Organic column unconfirmed">⚠</span>' : '';
-  const wrap = (svg, pctHtml) =>
-    `<div class="gt-ring-wrap">${svg}${pctHtml}</div>`;
+  const wrap = (svg, pctHtml, state) =>
+    `<div class="gt-ring-wrap gt-state-${state || 'gray'}">${svg}${pctHtml}</div>`;
   if (goal === null || goal === undefined) {
     // No goal: still show the projection (black, since there's nothing to
     // compare it to), so the month's run-rate is visible regardless.
@@ -4369,7 +4374,7 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
   }
   return `<div class="gt-ring-item gt-${tier}">
     <div class="gt-m-label">${label}${flagHtml}</div>
-    ${wrap(ring(fillPct, colorClass, size, stroke), `<div class="gt-pct gt-${colorClass}">${Math.round(fillPct*100)}%</div>`)}
+    ${wrap(ring(fillPct, colorClass, size, stroke), `<div class="gt-pct gt-${colorClass}">${Math.round(fillPct*100)}%</div>`, colorClass)}
     <div class="gt-proj gt-${colorClass}">${target.isPartial ? 'Projecting ' : ''}${fmt(proj)}</div>
     <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
     ${adjNote}
