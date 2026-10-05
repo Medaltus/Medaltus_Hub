@@ -302,7 +302,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
   display:none; flex:1; overflow-y:auto; background:var(--bg); color:var(--ink);
 }
 #goal-tracker-view.active{ display:block; }
-#goal-tracker-view .gt-wrap{ padding:20px 24px 40px; }
+#goal-tracker-view .gt-wrap{ padding:20px 24px 40px; container-type:inline-size; }
 #goal-tracker-view .gt-manager-block{ margin-top:28px; }
 #goal-tracker-view .gt-manager-block:first-of-type{ margin-top:0; }
 #goal-tracker-view .gt-period-bar{ margin-bottom:16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
@@ -329,25 +329,25 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 }
 #goal-tracker-view .gt-card-head .gt-chan{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
 #goal-tracker-view .gt-card-note{ margin:0 12px 6px; font-size:9.5px; color:#b4780f; }
-#goal-tracker-view .gt-group{ container-type:inline-size; background:var(--cream); margin:0 8px 8px; border-radius:7px; padding:14px 10px 12px; }
+#goal-tracker-view .gt-group{ background:var(--cream); margin:0 8px 8px; border-radius:7px; padding:14px 10px 12px; }
 #goal-tracker-view .gt-group-label{
   font-family:Georgia,'Times New Roman',serif; font-style:italic; font-weight:700;
   font-size:13px; color:var(--navy); margin-bottom:2px;
 }
 #goal-tracker-view .gt-group-note{ font-size:8.5px; color:#8a5a12; margin-bottom:5px; }
-#goal-tracker-view .gt-rings{ display:flex; flex-direction:row; flex-wrap:nowrap; align-items:stretch; gap:10px; }
+#goal-tracker-view .gt-rings{ display:flex; flex-direction:row; flex-wrap:nowrap; align-items:stretch; gap:10px; min-height:calc(max(80px, 5cqw) + 172px); }
 /* Total Sales: the headline goal, left, largest ring */
-#goal-tracker-view .gt-total-slot{ flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:clamp(8px,3cqw,20px) clamp(10px,4.5cqw,30px); }
+#goal-tracker-view .gt-total-slot{ flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:clamp(6px,0.75cqw,20px) clamp(8px,1.1cqw,30px); }
 /* Sales Contribution: explanatory, right, on a lighter panel so it reads as secondary */
 #goal-tracker-view .gt-contrib{
-  flex:1 1 0; min-width:0; display:flex; flex-direction:column;
-  background:transparent; border:1.5px solid #c9ccd4; border-radius:9px; padding:10px 6px 12px;
+  flex:1 1 0; min-width:0; display:flex; flex-direction:column; justify-content:center;
+  background:transparent; border:none; padding:10px 6px;
 }
 #goal-tracker-view .gt-contrib-title{
   font-size:10px; letter-spacing:.09em; text-transform:uppercase; font-weight:700;
-  color:#9a7b4d; text-align:center; margin-bottom:8px;
+  color:#9a7b4d; text-align:center; margin-bottom:3px;
 }
-#goal-tracker-view .gt-contrib-row{ flex:1; display:flex; justify-content:space-around; align-items:center; gap:8px; }
+#goal-tracker-view .gt-contrib-row{ flex:0 0 auto; display:flex; justify-content:space-around; align-items:flex-start; gap:8px; }
 #goal-tracker-view .gt-ring-item{ text-align:center; min-width:0; }
 #goal-tracker-view .gt-ring-item.gt-sm{ flex:1; }
 #goal-tracker-view .gt-ring-item .gt-m-label{ color:#5a5f72; margin-bottom:5px; }
@@ -355,18 +355,19 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view .gt-ring-item.gt-sm .gt-m-label{ font-size:11.5px; color:#6b7080; }
 #goal-tracker-view .gt-ring-wrap{ position:relative; margin:0 auto; aspect-ratio:1; }
 #goal-tracker-view .gt-ring-wrap svg{ display:block; width:100%; height:100%; }
+#goal-tracker-view .gt-sm .gt-track{ opacity:0.1; } /* 90% transparent track so the contribution rings pop less */
 /* ring sizes scale with the card's own width (container query units) so the
    side-by-side layout fits whether the row has 3 cards or 5 */
-#goal-tracker-view .gt-ring-item.gt-lg .gt-ring-wrap{ width:clamp(76px, 28cqw, 172px); }
-#goal-tracker-view .gt-ring-item.gt-sm .gt-ring-wrap{ width:clamp(48px, 21.5cqw, 112px); }
+#goal-tracker-view .gt-ring-item.gt-lg .gt-ring-wrap{ width:clamp(80px, 5cqw, 190px); }
+#goal-tracker-view .gt-ring-item.gt-sm .gt-ring-wrap{ width:clamp(52px, 3.8cqw, 120px); }
 #goal-tracker-view .gt-ring-wrap .gt-pct{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   text-align:center; font-weight:700; color:var(--navy); line-height:1.15;
 }
-#goal-tracker-view .gt-ring-item.gt-lg .gt-pct{ font-size:clamp(18px, 7.4cqw, 36px); }
-#goal-tracker-view .gt-ring-item.gt-sm .gt-pct{ font-size:clamp(11px, 5cqw, 22px); }
+#goal-tracker-view .gt-ring-item.gt-lg .gt-pct{ font-size:clamp(18px, 1.3cqw, 40px); }
+#goal-tracker-view .gt-ring-item.gt-sm .gt-pct{ font-size:clamp(11px, 0.9cqw, 24px); }
 #goal-tracker-view .gt-ring-item.gt-lg .gt-pct.gt-gray{ font-size:13px; }
-#goal-tracker-view .gt-ring-item.gt-sm .gt-pct.gt-gray{ font-size:clamp(8px, 2.4cqw, 10px); }
+#goal-tracker-view .gt-ring-item.gt-sm .gt-pct.gt-gray{ font-size:clamp(8px, 0.43cqw, 11px); }
 #goal-tracker-view .gt-ring-item .gt-goal{ color:#3d445c; margin-top:3px; }
 #goal-tracker-view .gt-ring-item.gt-lg .gt-goal{ font-size:14px; }
 #goal-tracker-view .gt-ring-item.gt-sm .gt-goal{ font-size:11.5px; }
@@ -390,7 +391,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view .gt-pct.gt-gray{ color:#9aa1b1; font-weight:600; }
 #goal-tracker-view .gt-proj.gt-green{ color:#1a9c73; }
 #goal-tracker-view .gt-proj.gt-red{ color:var(--danger); }
-#goal-tracker-view .gt-ring-item .gt-adj-note{ font-size:9px; color:#9aa1b1; margin-top:2px; line-height:1.25; }
+#goal-tracker-view .gt-ring-item .gt-adj-note{ white-space:nowrap; font-size:9px; color:#9aa1b1; margin-top:2px; line-height:1.25; }
 </style>
 </head>
 <body>
@@ -573,7 +574,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
       </div>
 
       <div class="gt-footnote">
-        <p>Ring fill = actual ÷ goal. Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. for X% avg. cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps.</p>
+        <p>Ring fill = actual ÷ goal. Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. X% cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps.</p>
       </div>
 
     </div>
@@ -4305,7 +4306,7 @@ function ring(fillPct, colorClass, size=104, stroke=9){
   const color = colorClass === 'green' ? 'var(--green)' : 'var(--danger)';
   const dash = clamped*circ;
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${stroke}"/>
+    <circle class="gt-track" cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${stroke}"/>
     <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
       stroke-dasharray="${dash} ${circ}" stroke-linecap="round"
       transform="rotate(-90 ${c} ${c})"/>
@@ -4343,8 +4344,8 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
   let adjNote = '';
   if (applyCancelAdj) {
     adjNote = cancelRate != null
-      ? `<div class="gt-adj-note">adj. for ${Math.round(cancelRate*100)}% avg. cancel rate</div>`
-      : `<div class="gt-adj-note">no cancel-rate history yet</div>`;
+      ? `<div class="gt-adj-note">adj. ${Math.round(cancelRate*100)}% cancel rate</div>`
+      : `<div class="gt-adj-note">no cancel history</div>`;
   }
   return `<div class="gt-ring-item gt-${tier}">
     <div class="gt-m-label">${label}${flagHtml}</div>
