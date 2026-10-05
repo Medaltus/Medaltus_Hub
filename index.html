@@ -335,14 +335,34 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
   font-size:13px; color:var(--navy); margin-bottom:2px;
 }
 #goal-tracker-view .gt-group-note{ font-size:8.5px; color:#8a5a12; margin-bottom:5px; }
-#goal-tracker-view .gt-rings{ display:flex; justify-content:space-between; gap:4px; }
-#goal-tracker-view .gt-ring-item{ text-align:center; flex:1; min-width:0; }
-#goal-tracker-view .gt-ring-item .gt-m-label{ font-size:11px; color:#5a5f72; margin-bottom:4px; }
-#goal-tracker-view .gt-ring-item svg{ display:block; margin:0 auto; }
-#goal-tracker-view .gt-ring-item .gt-pct{ position:relative; top:-70px; font-weight:700; font-size:18px; color:var(--navy); height:0; }
-#goal-tracker-view .gt-ring-item .gt-pct.gt-flat{ color:#9aa1b1; font-size:10px; font-weight:600; }
-#goal-tracker-view .gt-ring-item .gt-goal{ font-size:11px; color:#3d445c; margin-top:2px; }
-#goal-tracker-view .gt-ring-item .gt-proj{ font-size:10px; color:#6b7280; }
+#goal-tracker-view .gt-rings{ display:flex; flex-direction:column; align-items:stretch; gap:14px; }
+#goal-tracker-view .gt-total-slot{ display:flex; justify-content:center; }
+#goal-tracker-view .gt-contrib{ border-top:1px solid rgba(15,30,61,0.14); padding-top:10px; }
+#goal-tracker-view .gt-contrib-title{
+  font-size:10px; letter-spacing:.09em; text-transform:uppercase; font-weight:700;
+  color:#8a5a12; text-align:center; margin-bottom:10px;
+}
+#goal-tracker-view .gt-contrib-row{ display:flex; justify-content:space-around; gap:8px; }
+#goal-tracker-view .gt-ring-item{ text-align:center; min-width:0; }
+#goal-tracker-view .gt-ring-item.gt-sm{ flex:1; }
+#goal-tracker-view .gt-ring-item .gt-m-label{ color:#5a5f72; margin-bottom:5px; }
+#goal-tracker-view .gt-ring-item.gt-lg .gt-m-label{ font-size:14px; font-weight:700; color:var(--navy); }
+#goal-tracker-view .gt-ring-item.gt-sm .gt-m-label{ font-size:11px; }
+#goal-tracker-view .gt-ring-wrap{ position:relative; margin:0 auto; }
+#goal-tracker-view .gt-ring-wrap svg{ display:block; }
+#goal-tracker-view .gt-ring-wrap .gt-pct{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  text-align:center; font-weight:700; color:var(--navy); line-height:1.15;
+}
+#goal-tracker-view .gt-ring-item.gt-lg .gt-pct{ font-size:30px; }
+#goal-tracker-view .gt-ring-item.gt-sm .gt-pct{ font-size:17px; }
+#goal-tracker-view .gt-ring-item.gt-lg .gt-pct.gt-gray{ font-size:12px; }
+#goal-tracker-view .gt-ring-item.gt-sm .gt-pct.gt-gray{ font-size:9px; }
+#goal-tracker-view .gt-ring-item .gt-goal{ color:#3d445c; margin-top:3px; }
+#goal-tracker-view .gt-ring-item.gt-lg .gt-goal{ font-size:13px; }
+#goal-tracker-view .gt-ring-item.gt-sm .gt-goal{ font-size:11px; }
+#goal-tracker-view .gt-ring-item.gt-lg .gt-proj{ font-size:12px; margin-top:6px; }
+#goal-tracker-view .gt-ring-item.gt-sm .gt-proj{ font-size:10px; margin-top:5px; }
 #goal-tracker-view .gt-ring-item .gt-goal b{ color:var(--navy); }
 #goal-tracker-view .gt-ring-item .gt-flag{
   display:inline-block; margin-left:3px; font-size:9px; color:var(--muted);
@@ -358,7 +378,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
 #goal-tracker-view .gt-footnote .gt-flag-key{ color:var(--muted); font-weight:700; }
 #goal-tracker-view .gt-pct.gt-green{ color:#0d9b6c; }
 #goal-tracker-view .gt-pct.gt-red{ color:var(--danger); }
-#goal-tracker-view .gt-pct.gt-gray{ color:#9aa1b1; font-size:10px; font-weight:600; }
+#goal-tracker-view .gt-pct.gt-gray{ color:#9aa1b1; font-weight:600; }
 #goal-tracker-view .gt-proj.gt-green{ color:#1a9c73; }
 #goal-tracker-view .gt-proj.gt-red{ color:var(--danger); }
 #goal-tracker-view .gt-ring-item .gt-adj-note{ font-size:9px; color:#9aa1b1; margin-top:2px; line-height:1.25; }
@@ -4283,21 +4303,28 @@ function ring(fillPct, colorClass, size=104, stroke=9){
   </svg>`;
 }
 
-function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, target){
+function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, target, tier){
+  // tier: 'lg' = the headline Total Sales ring, 'sm' = the Sales
+  // Contribution rings (Organic / Ad). The % label is centered over the
+  // ring by .gt-ring-wrap (absolute, size-independent), so ring size can
+  // change per tier without re-tuning pixel offsets.
+  tier = tier || 'sm';
+  const size = tier === 'lg' ? 140 : 84;
+  const stroke = tier === 'lg' ? 12 : 8;
   const flagHtml = flagged ? '<span class="gt-flag" title="Organic column unconfirmed">⚠</span>' : '';
+  const wrap = (svg, pctHtml) =>
+    `<div class="gt-ring-wrap" style="width:${size}px;height:${size}px;">${svg}${pctHtml}</div>`;
   if (goal === null || goal === undefined) {
-    return `<div class="gt-ring-item">
+    return `<div class="gt-ring-item gt-${tier}">
       <div class="gt-m-label">${label}${flagHtml}</div>
-      ${ring(0,'gray')}
-      <div class="gt-pct gt-gray">No goal<br>set</div>
+      ${wrap(ring(0,'gray',size,stroke), '<div class="gt-pct gt-gray">No goal<br>set</div>')}
       <div class="gt-goal">${actual!=null ? (target.isPartial ? 'MTD ' : '') + fmt(actual) : '—'}</div>
     </div>`;
   }
   if (actual === null || actual === undefined) {
-    return `<div class="gt-ring-item">
+    return `<div class="gt-ring-item gt-${tier}">
       <div class="gt-m-label">${label}${flagHtml}</div>
-      ${ring(0,'gray')}
-      <div class="gt-pct gt-gray">Not available<br>yet</div>
+      ${wrap(ring(0,'gray',size,stroke), '<div class="gt-pct gt-gray">Not available<br>yet</div>')}
       <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
     </div>`;
   }
@@ -4310,10 +4337,9 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
       ? `<div class="gt-adj-note">adj. for ${Math.round(cancelRate*100)}% avg. cancel rate</div>`
       : `<div class="gt-adj-note">no cancel-rate history yet</div>`;
   }
-  return `<div class="gt-ring-item">
+  return `<div class="gt-ring-item gt-${tier}">
     <div class="gt-m-label">${label}${flagHtml}</div>
-    ${ring(fillPct, colorClass)}
-    <div class="gt-pct gt-${colorClass}">${Math.round(fillPct*100)}%</div>
+    ${wrap(ring(fillPct, colorClass, size, stroke), `<div class="gt-pct gt-${colorClass}">${Math.round(fillPct*100)}%</div>`)}
     <div class="gt-proj gt-${colorClass}">${target.isPartial ? 'Projecting ' : ''}${fmt(proj)}</div>
     <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
     ${adjNote}
@@ -4337,10 +4363,20 @@ function renderCard(elId, cfg){
   const actual = actualCache[period][elId] || { total: null, organic: null, ads: null };
   const cancelRate = cancelRateCache[elId];
   const applyCancelAdj = period === 'mtd' && !cfg.website;
+  // Total Sales is the headline performance goal — larger, on top, alone.
+  // Organic and Ad Sales sit below it under "Sales Contribution": they
+  // explain where Total came from, not a separate target of equal weight.
   el.innerHTML =
-    metricBlock('Total Sales', goal.total, actual.total, false, cancelRate, applyCancelAdj, target) +
-    metricBlock('Organic Sales', goal.organic, actual.organic, cfg.organicConfirmed === false, cancelRate, applyCancelAdj, target) +
-    metricBlock('Ad Sales', goal.ads, actual.ads, false, undefined, false, target);
+    `<div class="gt-total-slot">` +
+      metricBlock('Total Sales', goal.total, actual.total, false, cancelRate, applyCancelAdj, target, 'lg') +
+    `</div>` +
+    `<div class="gt-contrib">` +
+      `<div class="gt-contrib-title">Sales Contribution</div>` +
+      `<div class="gt-contrib-row">` +
+        metricBlock('Organic Sales', goal.organic, actual.organic, cfg.organicConfirmed === false, cancelRate, applyCancelAdj, target, 'sm') +
+        metricBlock('Ad Sales', goal.ads, actual.ads, false, undefined, false, target, 'sm') +
+      `</div>` +
+    `</div>`;
 }
 
 // Initial synchronous paint (fallback goal snapshot, actual pending) so
