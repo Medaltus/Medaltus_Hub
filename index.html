@@ -537,10 +537,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
           </div>
           <div class="gt-card">
             <div class="gt-card-head"><div class="gt-name">High On Love</div><div class="gt-chan">Amazon</div></div>
-            <div class="gt-placeholder">
-              <b>No actuals source found</b>
-              Not present in the Newderm orders cache (no gid on the SHEET_ORDERS tab) — confirm seller account with Lindsay.
-            </div>
+            <div class="gt-group"><div class="gt-group-label">Amazon</div><div class="gt-rings" id="r-highonlove"></div></div>
           </div>
           <div class="gt-card">
             <div class="gt-card-head"><div class="gt-name">The Crème Shop</div><div class="gt-chan">Amazon</div></div>
@@ -3906,6 +3903,15 @@ const BRAND_GOAL_CONFIG = {
   'r-amala':      { goalGid:2031782096, goalCols:{total:14, organic:null, ads:23}, goal:{total:1998, organic:null,  ads:467},   organicConfirmed:null,
                     ordersGid:1410727505, walmartGid:null,       adOrdersGid:489097625, brandSlug:'amala',
                     returnsGid:2009311556, walmartReturnsGid:null },
+  // High On Love — orders: Amazon Orders cache tab gid 451561762; ads: Ad
+  // Orders Cache 'high-on-love' tab gid 339757019; goals tab gid 558825674.
+  // Goal columns: Total = N(13), Ads = Y(24), Organic = U(20). Organic is
+  // NOT column R: R only holds the "Organic Sales Goal" label text (in the
+  // Jun-26 row); the monthly values sit in U and reconcile exactly
+  // (Sep-26: U $4,111.78 + Y $1,857 = N $5,968.78; same for Jul/Aug).
+  'r-highonlove': { goalGid:558825674,  goalCols:{total:13, organic:20, ads:24}, goal:{total:null, organic:null, ads:null}, organicConfirmed:true,
+                    ordersGid:451561762,  walmartGid:null,       adOrdersGid:339757019, brandSlug:'high-on-love',
+                    returnsGid:null, walmartReturnsGid:null },
   'r-cremeshop':  { goalGid:521249346,  goalCols:{total:13, organic:18, ads:25}, goal:{total:19708,  organic:14708, ads:5000},  organicConfirmed:true,
                     ordersGid:1259265896, walmartGid:null,       adOrdersGid:414661274, brandSlug:'creme-shop',
                     returnsGid:1558067719, walmartReturnsGid:null },
