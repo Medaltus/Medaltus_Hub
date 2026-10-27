@@ -320,6 +320,9 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
   box-shadow:0 1px 3px rgba(15,30,61,0.08); border:1px solid #e6e8ee;
 }
 #goal-tracker-view .gt-card.gt-wide{ grid-column: span 2; }
+#goal-tracker-view .gt-grid-row2{ margin-top:14px; }
+/* second row keeps the same card width as the 5-column row above it, instead of 2 cards stretching full width */
+@container (min-width: 1420px){ #goal-tracker-view .gt-grid-row2{ grid-template-columns:repeat(5, minmax(0, 1fr)); } }
 #goal-tracker-view .gt-card.gt-wide .gt-groups-row{ display:flex; gap:0; }
 #goal-tracker-view .gt-card.gt-wide .gt-groups-row .gt-group{ flex:1; margin:0 8px 8px; }
 #goal-tracker-view .gt-card-head{ padding:9px 14px 5px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; }
@@ -584,10 +587,20 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
             <div class="gt-group"><div class="gt-group-label">Amazon + Walmart</div><div class="gt-rings" id="r-pbj"></div></div>
           </div>
         </div>
+        <div class="gt-grid gt-grid-row2">
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">Dazzle Dry</div><div class="gt-chan">Amazon · Medaltus + VBC</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon — goal = last year + 50%</div><div class="gt-rings" id="r-dazzledry"></div></div>
+          </div>
+          <div class="gt-card">
+            <div class="gt-card-head"><div class="gt-name">Vivian Valenty Skincare</div><div class="gt-chan">Amazon</div></div>
+            <div class="gt-group"><div class="gt-group-label">Amazon — goal = last year + 50%</div><div class="gt-rings" id="r-vivianvalenty"></div></div>
+          </div>
+        </div>
       </div>
 
       <div class="gt-footnote">
-        <p>Ring fill = actual ÷ goal. Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. X% cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps.</p>
+        <p>Ring fill = actual ÷ goal. Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. X% cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps. Dazzle Dry and Vivian Valenty Skincare have no goal sheet: their goal is last year's same month + 50% (Orders_HISTORICAL), tracked on Revenue / Units / Orders, with all three cancel-rate adjusted.</p>
       </div>
 
     </div>
@@ -3890,6 +3903,15 @@ const EVOLIS_WEB_RETURNS_GID = '1033366681';
    tab. returnsGid/walmartReturnsGid are omitted where the master
    mapping has no gid for that brand (MiGuard has neither; several
    Amazon-only brands have no Walmart returns tab at all). */
+// Dazzle Dry + Vivian Valenty Skincare (VB Cosmetics order cache). Different
+// shape from the Newderm brands: no formal goal sheet and no ads split, so
+// these cards track Revenue / Units / Orders (same three as the VBC
+// dashboard's own Goal Tracker), with goal = last year's same month × 1.5
+// read from the Orders_HISTORICAL sheet.
+const VBC_ORDERS_FILE_ID = '11livmsd_yeV2SahxXpcb42K7yKsSa0s1BadXIeBRAVo'; // 120-day order cache
+const VBC_HIST_FILE_ID   = '1geMTQtWk6Qf3tnqjVKQPqbEhT5eKMfUIJAFg3q7Hnvw'; // Orders_HISTORICAL
+const VOLUME_GOAL_GROWTH = 1.5;
+
 const BRAND_GOAL_CONFIG = {
   'r-skinuva':    { goalGid:196666138,  goalCols:{total:13, organic:18, ads:26}, goal:{total:186800, organic:76000, ads:46700}, organicConfirmed:true,
                     ordersGid:39113380,   walmartGid:761373905,  adOrdersGid:2118939572, brandSlug:'skinuva',
@@ -3918,6 +3940,13 @@ const BRAND_GOAL_CONFIG = {
   'r-highonlove': { goalGid:558825674,  goalCols:{total:13, organic:20, ads:24}, goal:{total:null, organic:null, ads:null}, organicConfirmed:true,
                     ordersGid:451561762,  walmartGid:null,       adOrdersGid:339757019, brandSlug:'high-on-love',
                     returnsGid:null, walmartReturnsGid:null },
+  // Dazzle Dry = MEDALTUS tab + VBC tab combined (VBC is ~270k rows / ~33MB,
+  // hence the longer timeout). Goal source: 'Dazzle Dry - Combined' tab.
+  'r-dazzledry':  { kind:'volume', orderTabs:[746343784, 18422614], histGid:1320672097,
+                    goal:{total:null, organic:null, ads:null}, timeoutMs:45000 },
+  // Vivian Valenty Skincare: its own order tab + its own historical tab.
+  'r-vivianvalenty': { kind:'volume', orderTabs:[2011427195], histGid:366592914,
+                    goal:{total:null, organic:null, ads:null}, timeoutMs:20000 },
   'r-cremeshop':  { goalGid:521249346,  goalCols:{total:13, organic:18, ads:25}, goal:{total:19708,  organic:14708, ads:5000},  organicConfirmed:true,
                     ordersGid:1259265896, walmartGid:null,       adOrdersGid:414661274, brandSlug:'creme-shop',
                     returnsGid:1558067719, walmartReturnsGid:null },
@@ -4247,6 +4276,63 @@ function computeCancelRateFromRows(rows){
   return total > 0 ? cancelled / total : null;
 }
 
+// ── Volume brands (Dazzle Dry, Vivian Valenty) ──
+// One download per tab per page load, shared by MTD and Last Month (the
+// VBC tab is ~33MB, so it is never fetched twice).
+const volumeRowsCache = {};
+function getVolumeRows(gid, label){
+  const key = VBC_ORDERS_FILE_ID + ':' + gid;
+  if (!volumeRowsCache[key]) volumeRowsCache[key] = fetchCsvRows(VBC_ORDERS_FILE_ID, gid, label);
+  return volumeRowsCache[key];
+}
+
+// Revenue / Units / Orders for one month — same goals-valid filter as every
+// other brand here (exclude Cancelled + Vine, KEEP Pending). Revenue groups
+// by order_id summing item_price; Units = quantity_ordered; Orders =
+// distinct order_id.
+function sumVolumeMetrics(rows, year, month, throughDay){
+  const mm = String(month).padStart(2, '0');
+  const startStr = `${year}-${mm}-01`;
+  const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
+  let revenue = 0, units = 0;
+  const ids = new Set();
+  for (const r of rows) {
+    const d = normalizeDate(r.date);
+    if (!d || d < startStr || d > endStr || !isGoalsValidRow(r)) continue;
+    revenue += parseAmt(r.item_price);
+    units += parseFloat(r.quantity_ordered) || 0;
+    if (r.order_id) ids.add(r.order_id);
+  }
+  return { total: revenue, organic: units, ads: ids.size };
+}
+
+async function loadVolumeActual(elId, cfg, target){
+  const parts = await Promise.all(cfg.orderTabs.map(g => getVolumeRows(g, `${elId}/orders-${g}`)));
+  const rows = [].concat(...parts);
+  if (rows.length === 0) {
+    console.warn(`[GoalTracker][debug] ${elId}: order tabs came back empty — "Not available yet"`);
+    return { actual: { total: null, organic: null, ads: null }, cancelRate: undefined };
+  }
+  const m = sumVolumeMetrics(rows, target.year, target.month, target.throughDay);
+  const cancelRate = target.isPartial ? computeCancelRateFromRows(rows) : undefined;
+  console.log(`[GoalTracker][debug] ${elId}: revenue=${m.total} units=${m.organic} orders=${m.ads} cancelRate=${cancelRate} (${rows.length} rows, target=${target.year}-${target.month} thru ${target.throughDay})`);
+  return { actual: m, cancelRate };
+}
+
+// Goal = same month last year × 1.5, from the brand's Orders_HISTORICAL tab
+// (columns MONTH, YEAR, REVENUE, TOTAL_UNITS_SOLD, TOTAL_ORDERS_PLACED).
+// A missing row or a zero/blank value = no goal for that metric.
+async function fetchVolumeGoal(cfg, year, month){
+  const rows = await fetchCsvRows(VBC_HIST_FILE_ID, cfg.histGid, `hist-${cfg.histGid}`);
+  const row = rows.find(r => parseInt(r.MONTH, 10) === month && parseInt(r.YEAR, 10) === year - 1);
+  const g = v => { const n = parseGoalAmt(v); return (n && n > 0) ? n * VOLUME_GOAL_GROWTH : null; };
+  if (!row) return { total: null, organic: null, ads: null, lastYear: null };
+  return {
+    total: g(row.REVENUE), organic: g(row.TOTAL_UNITS_SOLD), ads: g(row.TOTAL_ORDERS_PLACED),
+    lastYear: { total: parseGoalAmt(row.REVENUE), organic: parseGoalAmt(row.TOTAL_UNITS_SOLD), ads: parseGoalAmt(row.TOTAL_ORDERS_PLACED) },
+  };
+}
+
 function withTimeout(promise, ms){
   return Promise.race([
     promise,
@@ -4259,6 +4345,7 @@ function withTimeout(promise, ms){
 // be read (network/CORS/empty sheet) — a confirmed zero still renders
 // as $0, never silently blank.
 async function loadBrandActual(elId, cfg, target){
+  if (cfg.kind === 'volume') return loadVolumeActual(elId, cfg, target);
   if (cfg.website) {
     // Per Jaclyn: the real évolis dashboard's "Organic = Total" for
     // Website is itself a mistake there, not something to match. Back
@@ -4310,6 +4397,8 @@ async function loadBrandActual(elId, cfg, target){
 }
 
 function fmt(n){ return (n===null||n===undefined) ? '—' : '$' + Math.round(n).toLocaleString(); }
+window.__gtFmtDollar = fmt;
+function fmtNum(n){ return (n===null||n===undefined) ? '—' : Math.round(n).toLocaleString(); }
 
 function projected(actual, cancelRate, applyCancelAdj, target){
   if (actual === null) return null;
@@ -4325,7 +4414,8 @@ function projected(actual, cancelRate, applyCancelAdj, target){
 // (Total + Organic; not Ads, not the Website group, which have no
 // order-level cancel data). Not shown for Last Month: that month is closed,
 // so its final actual is already the figure on the line above.
-function liveRow(actual, cancelRate, applyCancelAdj, target){
+function liveRow(actual, cancelRate, applyCancelAdj, target, fmt){
+  fmt = fmt || window.__gtFmtDollar;
   if (!target.isPartial) return '';
   if (actual === null || actual === undefined) {
     return '<div class="gt-live"><span class="gt-live-dot"></span>LIVE: <b>—</b></div>';
@@ -4350,7 +4440,8 @@ function ring(fillPct, colorClass, size=104, stroke=9){
   </svg>`;
 }
 
-function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, target, tier){
+function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, target, tier, fmt){
+  fmt = fmt || window.__gtFmtDollar; // Units/Orders pass fmtNum (no $)
   // tier: 'lg' = the headline Total Sales ring, 'sm' = the Sales
   // Contribution rings (Organic / Ad). The % label is centered over the
   // ring by .gt-ring-wrap (absolute, size-independent), so ring size can
@@ -4380,7 +4471,7 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
       ${wrap(ring(0,'gray',size,stroke), '<div class="gt-pct gt-gray">No goal<br>set</div>')}
       ${projRow}
       <div class="gt-goal">Goal <b>—</b></div>
-      ${liveRow(actual, cancelRate, applyCancelAdj, target)}
+      ${liveRow(actual, cancelRate, applyCancelAdj, target, fmt)}
       ${noGoalAdj}
     </div>`;
   }
@@ -4389,7 +4480,7 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
       <div class="gt-m-label">${label}${flagHtml}</div>
       ${wrap(ring(0,'gray',size,stroke), '<div class="gt-pct gt-gray">Not available<br>yet</div>')}
       <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
-      ${liveRow(actual, cancelRate, applyCancelAdj, target)}
+      ${liveRow(actual, cancelRate, applyCancelAdj, target, fmt)}
     </div>`;
   }
   const fillPct = actual / goal;
@@ -4406,7 +4497,7 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
     ${wrap(ring(fillPct, colorClass, size, stroke), `<div class="gt-pct gt-${colorClass}">${Math.round(fillPct*100)}%</div>`, colorClass)}
     <div class="gt-proj gt-${colorClass}">${target.isPartial ? 'Projecting ' : ''}${fmt(proj)}</div>
     <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
-    ${liveRow(actual, cancelRate, applyCancelAdj, target)}
+    ${liveRow(actual, cancelRate, applyCancelAdj, target, fmt)}
     ${adjNote}
   </div>`;
 }
@@ -4428,6 +4519,22 @@ function renderCard(elId, cfg){
   const actual = actualCache[period][elId] || { total: null, organic: null, ads: null };
   const cancelRate = cancelRateCache[elId];
   const applyCancelAdj = period === 'mtd' && !cfg.website;
+  if (cfg.kind === 'volume') {
+    // Revenue headline; Units + Orders as the secondary pair. All three come
+    // from order-level data, so the cancel-rate adjustment applies to all.
+    el.innerHTML =
+      `<div class="gt-total-slot">` +
+        metricBlock('Revenue', goal.total, actual.total, false, cancelRate, applyCancelAdj, target, 'lg', fmt) +
+      `</div>` +
+      `<div class="gt-contrib">` +
+        `<div class="gt-contrib-title">Volume</div>` +
+        `<div class="gt-contrib-row">` +
+          metricBlock('Units', goal.organic, actual.organic, false, cancelRate, applyCancelAdj, target, 'sm', fmtNum) +
+          metricBlock('Orders', goal.ads, actual.ads, false, cancelRate, applyCancelAdj, target, 'sm', fmtNum) +
+        `</div>` +
+      `</div>`;
+    return;
+  }
   // Total Sales is the headline performance goal — larger, on top, alone.
   // Organic and Ad Sales sit below it under "Sales Contribution": they
   // explain where Total came from, not a separate target of equal weight.
@@ -4459,6 +4566,15 @@ async function loadPeriod(period){
   // Confirmed against two saved-working file versions that this was
   // never the problem; the stagger/retry logic added afterward was.
   await Promise.all(Object.entries(BRAND_GOAL_CONFIG).map(async ([elId, cfg]) => {
+    if (!goalCache[period][elId] && cfg.kind === 'volume') {
+      const g = await withTimeout(fetchVolumeGoal(cfg, target.year, target.month), 8000);
+      if (g) {
+        goalCache[period][elId] = g;
+        if (activePeriod === period) renderCard(elId, cfg);
+      } else {
+        console.warn(`[GoalTracker][debug] ${elId}: historical goal fetch timed out`);
+      }
+    }
     if (!goalCache[period][elId] && cfg.goalGid) {
       const g = await withTimeout(fetchLiveGoal(cfg, monthStr), 4000);
       if (g) {
@@ -4469,14 +4585,14 @@ async function loadPeriod(period){
       }
     }
     if (!actualCache[period][elId]) {
-      const result = await withTimeout(loadBrandActual(elId, cfg, target), 8000);
+      const result = await withTimeout(loadBrandActual(elId, cfg, target), cfg.timeoutMs || 8000);
       if (result !== undefined) {
         actualCache[period][elId] = result.actual;
         if (period === 'mtd' && result.cancelRate !== undefined) cancelRateCache[elId] = result.cancelRate;
         if (activePeriod === period) renderCard(elId, cfg);
         outcomes.push(`${elId}: total=${result.actual.total}`);
       } else {
-        console.warn(`[GoalTracker][debug] ${elId}: loadBrandActual did not finish within 8s — stuck on "Not available yet"`);
+        console.warn(`[GoalTracker][debug] ${elId}: loadBrandActual did not finish within ${(cfg.timeoutMs || 8000)/1000}s — stuck on "Not available yet"`);
         outcomes.push(`${elId}: TIMED OUT`);
       }
     }
