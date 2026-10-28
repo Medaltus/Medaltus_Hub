@@ -600,7 +600,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
       </div>
 
       <div class="gt-footnote">
-        <p>Ring fill = actual ÷ goal. Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. X% cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps. Dazzle Dry and Vivian Valenty Skincare have no goal sheet: their goal is last year's same month + 50% (Orders_HISTORICAL), tracked on Revenue / Units / Orders, with all three cancel-rate adjusted.</p>
+        <p>Ring fill = actual ÷ goal (MTD Total and Organic use the cancel-adjusted actual, i.e. the LIVE figure). Ring color = projected ÷ goal (green ≥ 100%, red &lt; 100%) — binary, same rule for every metric including Ad Sales. Gray means either "No goal set" (goal column empty) or "Not available yet" (goal exists, actuals don't). Total Sales and Organic Sales projections are discounted by each brand's own pooled historical cancellation rate ("adj. X% cancel rate") — Ad Sales and évolis's Website group are intentionally left on the plain run-rate. <span class="gt-flag-key">⚠</span> next to a goal figure = the Organic goal column itself is unconfirmed on that brand's sheet (stale header) — unrelated to the actuals gaps. Dazzle Dry and Vivian Valenty Skincare have no goal sheet: their goal is last year's same month + 50% (Orders_HISTORICAL), tracked on Revenue / Units / Orders, with all three cancel-rate adjusted.</p>
       </div>
 
     </div>
@@ -4547,7 +4547,13 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
       ${liveRow(actual, cancelRate, applyCancelAdj, target, fmt)}
     </div>`;
   }
-  const fillPct = actual / goal;
+  // Fill uses the same cancel-adjusted actual as the LIVE line (where the
+  // adjustment applies), so the % can't read "over goal" while the
+  // cancel-adjusted projection reads "under goal". Raw actual includes
+  // orders that historically cancel (e.g. MiGuard: raw $2,474 = 101%, but
+  // after its 13% cancel rate it's $2,152 = 88%, projecting $2,383 < $2,450).
+  const adjActual = (applyCancelAdj && cancelRate !== undefined && cancelRate !== null) ? actual * (1 - cancelRate) : actual;
+  const fillPct = adjActual / goal;
   const proj = projected(actual, cancelRate, applyCancelAdj, target);
   const colorClass = proj >= goal ? 'green' : 'red';
   let adjNote = '';
