@@ -20,7 +20,7 @@
   --navy:#001F60; --slate:#6B7BA2; --green:#24E9A3; --sand:#F4DFD0; --silver:#CCD3D5;
   --white:#ffffff; --bg:#F5F6F9; --bg2:#ECEEF4;
   --border:rgba(0,31,96,0.10); --border2:rgba(0,31,96,0.06);
-  --text:#001F60; --muted:#6B7BA2; --success:#17A87A; --warn:#C87D2F; --danger:#B84040;
+  --text:#001F60; --muted:#6B7BA2; --success:#17A87A; --warn:#C87D2F; --danger:#794141;
   --font:'DM Sans',system-ui,sans-serif; --mono:'DM Mono','Fira Mono',monospace;
   --radius:10px; --radius-sm:6px;
 }
@@ -4150,6 +4150,34 @@ function sumOrdersRevenue(rows, year, month, throughDay){
   return Object.values(orderTotals).reduce((s, v) => s + v, 0);
 }
 
+// Statuses that mean an order hasn't settled yet (can still cancel).
+// Amazon: Pending / Unshipped / PartiallyShipped. Walmart: Created / Acknowledged.
+const UNSETTLED_STATUSES = new Set(['pending', 'unshipped', 'partiallyshipped', 'created', 'acknowledged']);
+function isPendingRow(row){ return UNSETTLED_STATUSES.has((row.status || '').toLowerCase().trim()); }
+
+// Same as sumOrdersRevenue, but also reports how much of that revenue sits
+// in orders that are still unsettled (an order counts as pending if any of
+// its goals-valid lines is pending).
+function sumOrdersRevenueDetailed(rows, year, month, throughDay){
+  const mm = String(month).padStart(2, '0');
+  const startStr = `${year}-${mm}-01`;
+  const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
+  const orders = {};
+  for (const r of rows) {
+    const d = normalizeDate(r.date);
+    if (!d || d < startStr || d > endStr || !isGoalsValidRow(r) || !r.order_id) continue;
+    const o = orders[r.order_id] || (orders[r.order_id] = { value: 0, pending: false });
+    o.value += parseAmt(r.item_price);
+    if (isPendingRow(r)) o.pending = true;
+  }
+  let total = 0, pendingValue = 0, pendingOrders = 0;
+  for (const o of Object.values(orders)) {
+    total += o.value;
+    if (o.pending) { pendingValue += o.value; pendingOrders++; }
+  }
+  return { total, pendingValue, pendingOrders };
+}
+
 // Amazon's FBA Returns report tracks units only — no dollar column at
 // all. Each return's $ impact is estimated as (returned quantity × that
 // ASIN's average item_price from the Amazon Orders rows already
@@ -4313,16 +4341,18 @@ function sumVolumeMetrics(rows, year, month, throughDay){
   const mm = String(month).padStart(2, '0');
   const startStr = `${year}-${mm}-01`;
   const endStr = `${year}-${mm}-${String(throughDay).padStart(2, '0')}`;
-  let revenue = 0, units = 0;
-  const ids = new Set();
+  let revenue = 0, units = 0, pRevenue = 0, pUnits = 0;
+  const ids = new Set(), pIds = new Set();
   for (const r of rows) {
     const d = normalizeDate(r.date);
     if (!d || d < startStr || d > endStr || !isGoalsValidRow(r)) continue;
-    revenue += parseAmt(r.item_price);
-    units += parseFloat(r.quantity_ordered) || 0;
+    const v = parseAmt(r.item_price), u = parseFloat(r.quantity_ordered) || 0;
+    revenue += v; units += u;
     if (r.order_id) ids.add(r.order_id);
+    if (isPendingRow(r)) { pRevenue += v; pUnits += u; if (r.order_id) pIds.add(r.order_id); }
   }
-  return { total: revenue, organic: units, ads: ids.size };
+  return { total: revenue, organic: units, ads: ids.size,
+           pending: { total: pRevenue, organic: pUnits, ads: pIds.size } };
 }
 
 async function loadVolumeActual(elId, cfg, target){
@@ -4334,8 +4364,19 @@ async function loadVolumeActual(elId, cfg, target){
   }
   const m = sumVolumeMetrics(rows, target.year, target.month, target.throughDay);
   const cancelRate = target.isPartial ? computeCancelRateFromRows(rows) : undefined;
+  let lm;
+  if (!target.isPartial) {
+    // Last Month: pending portion discounted by cancel rate until settled (see loadBrandActual).
+    const pendingOrders = m.pending.ads;
+    const lmRate = pendingOrders > 0 ? computeCancelRateFromRows(rows) : null;
+    if (pendingOrders > 0 && lmRate !== null) {
+      m.total -= m.pending.total * lmRate; m.organic -= m.pending.organic * lmRate; m.ads -= m.pending.ads * lmRate;
+    }
+    lm = { pendingOrders, pendingValue: m.pending.total, cancelRate: lmRate };
+  }
+  delete m.pending;
   console.log(`[GoalTracker][debug] ${elId}: revenue=${m.total} units=${m.organic} orders=${m.ads} cancelRate=${cancelRate} (${rows.length} rows, target=${target.year}-${target.month} thru ${target.throughDay})`);
-  return { actual: m, cancelRate };
+  return { actual: m, cancelRate, lm };
 }
 
 // Goal = same month last year × 1.5, from the brand's Orders_HISTORICAL tab
@@ -4440,24 +4481,44 @@ async function loadBrandActual(elId, cfg, target){
   const wmtTotal = cfg.walmartGid ? sumOrdersRevenue(wmtRows, target.year, target.month, target.throughDay) : 0;
   // Amazon Canada (CAD → USD). A missing CA ads row counts as $0 (CA is a
   // small add-on); a missing US ads row still blanks Ad + Organic as before.
-  let caTotalUsd = 0, caAdsUsd = 0, caRows = [];
+  let caTotalUsd = 0, caAdsUsd = 0, caRows = [], caPendingUsd = 0, caPendingOrders = 0;
   if (ca) {
     const [caOrderRows, caAdRows, rate] = ca;
     caRows = caOrderRows;
-    caTotalUsd = sumOrdersRevenue(caOrderRows, target.year, target.month, target.throughDay) * rate;
+    const caDet = sumOrdersRevenueDetailed(caOrderRows, target.year, target.month, target.throughDay);
+    caTotalUsd = caDet.total * rate;
+    caPendingUsd = caDet.pendingValue * rate;
+    caPendingOrders = caDet.pendingOrders;
     const caAdsCad = sumAdSales(caAdRows, target.year, target.month);
     if (caAdsCad === null) console.warn(`[GoalTracker][debug] ${elId}: no CA Advertising Cache row for ${target.year}-${target.month} — CA ads counted as $0`);
     caAdsUsd = (caAdsCad || 0) * rate;
     console.log(`[GoalTracker][debug] ${elId}: CA orders USD=${caTotalUsd.toFixed(2)} CA ads USD=${caAdsUsd.toFixed(2)} (rate ${rate}, ${caOrderRows.length} CA rows)`);
   }
-  const total = amzTotal + wmtTotal + caTotalUsd;
+  let total = amzTotal + wmtTotal + caTotalUsd;
   const usAds = cfg.adsGid ? sumAdSales(adRows, target.year, target.month) : null;
   const ads = usAds === null ? null : usAds + caAdsUsd;
+
+  // Last Month isn't final while orders are still pending: we can't assume
+  // every pending order ships. Until they settle, the pending portion is
+  // discounted by the brand's avg. cancel rate; settled orders count at
+  // their real status. Once nothing is pending, the month is closed and
+  // shows the plain actual.
+  let lm;
+  if (!target.isPartial) {
+    const a = sumOrdersRevenueDetailed(amzRows, target.year, target.month, target.throughDay);
+    const w = cfg.walmartGid ? sumOrdersRevenueDetailed(wmtRows, target.year, target.month, target.throughDay) : { pendingValue: 0, pendingOrders: 0 };
+    const pendingOrders = a.pendingOrders + w.pendingOrders + caPendingOrders;
+    const pendingValue = a.pendingValue + w.pendingValue + caPendingUsd;
+    const lmRate = pendingOrders > 0 ? computeCancelRateFromRows(amzRows.concat(wmtRows, caRows)) : null;
+    if (pendingOrders > 0 && lmRate !== null) total -= pendingValue * lmRate;
+    lm = { pendingOrders, pendingValue, cancelRate: lmRate };
+    console.log(`[GoalTracker][debug] ${elId}: last month ${pendingOrders} pending order(s) worth ${pendingValue.toFixed(2)}, cancel rate ${lmRate} → total ${total.toFixed(2)}`);
+  }
   if (cfg.adsGid && usAds === null) console.warn(`[GoalTracker][debug] ${elId}: no Advertising Cache row for ${target.year}-${target.month} yet — Ad + Organic show "Not available yet"`);
   const organic = ads === null ? null : Math.max(0, total - ads);
   const cancelRate = target.isPartial ? computeCancelRateFromRows(caRows.length ? amzRows.concat(caRows) : amzRows) : undefined;
   console.log(`[GoalTracker][debug] ${elId}: amzTotal=${amzTotal} wmtTotal=${wmtTotal} total=${total} ads=${ads} organic=${organic} cancelRate=${cancelRate} (${amzRows.length} amz rows, ${wmtRows.length} wmt rows, ${adRows.length} ad rows, target=${target.year}-${target.month} thru ${target.throughDay})`);
-  return { actual: { total, organic, ads }, cancelRate };
+  return { actual: { total, organic, ads }, cancelRate, lm };
 }
 
 function fmt(n){ return (n===null||n===undefined) ? '—' : '$' + Math.round(n).toLocaleString(); }
@@ -4504,7 +4565,7 @@ function ring(fillPct, colorClass, size=104, stroke=9){
   </svg>`;
 }
 
-function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, target, tier, fmt){
+function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, target, tier, fmt, noteOverride){
   fmt = fmt || window.__gtFmtDollar; // Units/Orders pass fmtNum (no $)
   // tier: 'lg' = the headline Total Sales ring, 'sm' = the Sales
   // Contribution rings (Organic / Ad). The % label is centered over the
@@ -4536,7 +4597,7 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
       ${projRow}
       <div class="gt-goal">Goal <b>—</b></div>
       ${liveRow(actual, cancelRate, applyCancelAdj, target, fmt)}
-      ${noGoalAdj}
+      ${noteOverride !== undefined ? noteOverride : noGoalAdj}
     </div>`;
   }
   if (actual === null || actual === undefined) {
@@ -4568,7 +4629,7 @@ function metricBlock(label, goal, actual, flagged, cancelRate, applyCancelAdj, t
     <div class="gt-proj gt-${colorClass}">${target.isPartial ? 'Projecting ' : ''}${fmt(proj)}</div>
     <div class="gt-goal">Goal <b>${fmt(goal)}</b></div>
     ${liveRow(actual, cancelRate, applyCancelAdj, target, fmt)}
-    ${adjNote}
+    ${noteOverride !== undefined ? noteOverride : adjNote}
   </div>`;
 }
 
@@ -4577,6 +4638,7 @@ let activePeriod = 'mtd';
 const goalCache   = { mtd: {}, lastmonth: {} };
 const actualCache = { mtd: {}, lastmonth: {} };
 const cancelRateCache = {};
+const lastMonthInfo = {}; // elId -> { pendingOrders, pendingValue, cancelRate }
 
 function currentTarget(){ return activePeriod === 'mtd' ? getMtdTarget() : getLastMonthTarget(); }
 
@@ -4589,18 +4651,27 @@ function renderCard(elId, cfg){
   const actual = actualCache[period][elId] || { total: null, organic: null, ads: null };
   const cancelRate = cancelRateCache[elId];
   const applyCancelAdj = period === 'mtd' && !cfg.website;
+  // Last Month status note (Total/Organic; all three for volume brands):
+  // "N pending · adj. X%" while orders are still unsettled, "closed" once none are.
+  let lmNote;
+  const lmi = period === 'lastmonth' ? lastMonthInfo[elId] : null;
+  if (lmi) {
+    lmNote = lmi.pendingOrders > 0
+      ? `<div class="gt-adj-note">${lmi.pendingOrders} pending${lmi.cancelRate != null ? ` · adj. ${Math.round(lmi.cancelRate*100)}%` : ''}</div>`
+      : `<div class="gt-adj-note">closed · no pending</div>`;
+  }
   if (cfg.kind === 'volume') {
     // Revenue headline; Units + Orders as the secondary pair. All three come
     // from order-level data, so the cancel-rate adjustment applies to all.
     el.innerHTML =
       `<div class="gt-total-slot">` +
-        metricBlock('Revenue', goal.total, actual.total, false, cancelRate, applyCancelAdj, target, 'lg', fmt) +
+        metricBlock('Revenue', goal.total, actual.total, false, cancelRate, applyCancelAdj, target, 'lg', fmt, lmNote) +
       `</div>` +
       `<div class="gt-contrib">` +
         `<div class="gt-contrib-title">Volume</div>` +
         `<div class="gt-contrib-row">` +
-          metricBlock('Units', goal.organic, actual.organic, false, cancelRate, applyCancelAdj, target, 'sm', fmtNum) +
-          metricBlock('Orders', goal.ads, actual.ads, false, cancelRate, applyCancelAdj, target, 'sm', fmtNum) +
+          metricBlock('Units', goal.organic, actual.organic, false, cancelRate, applyCancelAdj, target, 'sm', fmtNum, lmNote) +
+          metricBlock('Orders', goal.ads, actual.ads, false, cancelRate, applyCancelAdj, target, 'sm', fmtNum, lmNote) +
         `</div>` +
       `</div>`;
     return;
@@ -4610,12 +4681,12 @@ function renderCard(elId, cfg){
   // explain where Total came from, not a separate target of equal weight.
   el.innerHTML =
     `<div class="gt-total-slot">` +
-      metricBlock('Total Sales', goal.total, actual.total, false, cancelRate, applyCancelAdj, target, 'lg') +
+      metricBlock('Total Sales', goal.total, actual.total, false, cancelRate, applyCancelAdj, target, 'lg', undefined, lmNote) +
     `</div>` +
     `<div class="gt-contrib">` +
       `<div class="gt-contrib-title">Sales Contribution</div>` +
       `<div class="gt-contrib-row">` +
-        metricBlock('Organic Sales', goal.organic, actual.organic, cfg.organicConfirmed === false, cancelRate, applyCancelAdj, target, 'sm') +
+        metricBlock('Organic Sales', goal.organic, actual.organic, cfg.organicConfirmed === false, cancelRate, applyCancelAdj, target, 'sm', undefined, lmNote) +
         metricBlock('Ad Sales', goal.ads, actual.ads, false, undefined, false, target, 'sm') +
       `</div>` +
     `</div>`;
@@ -4659,6 +4730,7 @@ async function loadPeriod(period){
       if (result !== undefined) {
         actualCache[period][elId] = result.actual;
         if (period === 'mtd' && result.cancelRate !== undefined) cancelRateCache[elId] = result.cancelRate;
+        if (period === 'lastmonth' && result.lm) lastMonthInfo[elId] = result.lm;
         if (activePeriod === period) renderCard(elId, cfg);
         outcomes.push(`${elId}: total=${result.actual.total}`);
       } else {
