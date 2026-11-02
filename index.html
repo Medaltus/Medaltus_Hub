@@ -20,7 +20,7 @@
   --navy:#001F60; --slate:#6B7BA2; --green:#24E9A3; --sand:#F4DFD0; --silver:#CCD3D5;
   --white:#ffffff; --bg:#F5F6F9; --bg2:#ECEEF4;
   --border:rgba(0,31,96,0.10); --border2:rgba(0,31,96,0.06);
-  --text:#001F60; --muted:#6B7BA2; --success:#17A87A; --warn:#C87D2F; --danger:#794141;
+  --text:#001F60; --muted:#6B7BA2; --success:#17A87A; --warn:#C87D2F; --danger:#B84040;
   --font:'DM Sans',system-ui,sans-serif; --mono:'DM Mono','Fira Mono',monospace;
   --radius:10px; --radius-sm:6px;
 }
@@ -448,7 +448,7 @@ table.data-table tbody td{padding:9px 12px;font-size:12px;color:var(--navy);font
       <div class="bs-search"><input type="text" placeholder="Search brands…" oninput="filterBrands(this.value)"></div>
       <div class="bs-list" id="a-brand-list">
         <div class="bs-section">Live — Newderm Seller</div>
-        <button class="brand-item active" onclick="selectBrandA(this,'Évolis','evolis','https://evolis.medaltus.com/')">
+        <button class="brand-item" onclick="selectBrandA(this,'Évolis','evolis','https://evolis.medaltus.com/')">
           <div class="brand-dot live"></div><div class="bi-info"><div class="bi-name">Évolis</div><div class="bi-sub">Hair care</div></div><span class="bi-tag">3ch</span>
         </button>
         <button class="brand-item" onclick="selectBrandA(this,'Skinuva','skinuva','https://skinuva.medaltus.com/')">
@@ -5258,9 +5258,10 @@ function setViewA(mode) {
   }
 }
 
-// Initialise A with evolis
-activateEvolisSummary(document.getElementById('a-cards-content'));
-renderIframeA(currentUrlA, currentNameA);
+// Initialise A on the Overview — All Brands page. No brand is selected and
+// no brand dashboard/iframe is loaded until one is clicked in the sidebar
+// (selectBrandA then loads its Summary + dashboard exactly as before).
+showOverview(document.getElementById('nav-overview-btn'));
 
 // ── Option B logic ──
 function selectBrandB(id, btn) {
